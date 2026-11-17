@@ -1,0 +1,176 @@
+#!/usr/bin/env bash
+# flux-webui launcher — N1
+# Hanya menyentuh PID file milik flux-webui sendiri. Tidak pernah memakai
+# pkill/killall dan tidak pernah menyentuh proses/file proyek lain.
+set -u
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+STATE="${HOME}/.local/state/flux-webui"
+PIDFILE="${STATE}/flux-webui.pid"
+LOGFILE="${STATE}/flux-webui.stderr.log"
+HOST="127.0.0.1"
+PORT="28572"
+BASE="http://${HOST}:${PORT}"
+
+mkdir -p "$STATE" 2>/dev/null || true
+chmod 700 "$STATE" 2>/dev/null || true
+
+log() { printf '%s\n' "$*"; }
+
+pid_alive() {
+  case "${1:-}" in
+    '' | *[!0-9]*) return 1 ;;
+  esac
+  kill -0 "$1" 2>/dev/null
+}
+
+pid_is_flux() {
+  local pid="$1" cmd
+  [ -r "/proc/${pid}/cmdline" ] || return 1
+  cmd="$(tr '\0' ' ' < "/proc/${pid}/cmdline" 2>/dev/null)"
+  case "$cmd" in
+    *server.mjs*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+port_open() {
+  (exec 3<>"/dev/tcp/${HOST}/${PORT}") >/dev/null 2>&1
+}
+
+healthz() {
+  curl -fsS --max-time 5 "${BASE}/healthz" 2>/dev/null
+}
+
+read_pid() {
+  cat "$PIDFILE" 2>/dev/null
+}
+
+start_cmd() {
+  local pid body
+  if [ -f "$PIDFILE" ]; then
+    pid="$(read_pid)"
+    if pid_alive "$pid"; then
+      log "flux-webui: sudah berjalan (PID ${pid})"
+      return 1
+    fi
+    log "PID file basi (PID ${pid:-?} tidak hidup), dihapus"
+    rm -f "$PIDFILE"
+  fi
+
+  if port_open; then
+    log "flux-webui: port ${PORT} sudah dipakai proses lain; start dibatalkan"
+    return 1
+  fi
+
+  cd "$ROOT" || return 1
+  setsid node server.mjs >>"$LOGFILE" 2>&1 &
+  pid=$!
+  printf '%s\n' "$pid" >"$PIDFILE"
+
+  for _ in $(seq 1 40); do
+    if ! pid_alive "$pid"; then
+      log "flux-webui: gagal start (PID ${pid} berhenti). Log terakhir:"
+      tail -n 20 "$LOGFILE"
+      rm -f "$PIDFILE"
+      return 1
+    fi
+    body="$(healthz)"
+    if [ -n "$body" ]; then
+      log "flux-webui: started (PID ${pid})"
+      log "healthz: ${body}"
+      return 0
+    fi
+    sleep 0.25
+  done
+
+  log "flux-webui: gagal start, /healthz tidak merespons dalam 10s. Log terakhir:"
+  tail -n 20 "$LOGFILE"
+  return 1
+}
+
+stop_cmd() {
+  local pid
+  if [ ! -f "$PIDFILE" ]; then
+    log "flux-webui: stopped (PID file tidak ada)"
+    if port_open; then
+      log "peringatan: port ${PORT} masih terbuka"
+      return 1
+    fi
+    log "port ${PORT} bebas"
+    return 0
+  fi
+
+  pid="$(read_pid)"
+  if [ -z "$pid" ] || ! pid_alive "$pid"; then
+    rm -f "$PIDFILE"
+    log "flux-webui: stopped (PID file basi dihapus)"
+    if port_open; then
+      log "peringatan: port ${PORT} masih terbuka"
+      return 1
+    fi
+    log "port ${PORT} bebas"
+    return 0
+  fi
+
+  if ! pid_is_flux "$pid"; then
+    log "flux-webui: menolak kill, PID ${pid} bukan server.mjs flux-webui"
+    return 1
+  fi
+
+  log "flux-webui: menghentikan PID ${pid} (SIGTERM)"
+  kill "$pid" 2>/dev/null
+
+  for _ in $(seq 1 40); do
+    pid_alive "$pid" || break
+    sleep 0.25
+  done
+
+  if pid_alive "$pid"; then
+    log "flux-webui: PID ${pid} masih hidup setelah 10s, kirim SIGKILL (hanya PID ini)"
+    kill -9 "$pid" 2>/dev/null
+    sleep 0.5
+  fi
+
+  rm -f "$PIDFILE"
+  if port_open; then
+    log "flux-webui: port ${PORT} masih terbuka"
+    return 1
+  fi
+  log "flux-webui: stopped; port ${PORT} bebas"
+  return 0
+}
+
+status_cmd() {
+  local pid body
+  pid="$(read_pid)"
+  if [ -n "$pid" ] && pid_alive "$pid" && pid_is_flux "$pid"; then
+    log "flux-webui: running (PID ${pid})"
+    body="$(healthz)"
+    if [ -n "$body" ]; then
+      log "healthz: ${body}"
+    else
+      log "healthz: tidak merespons"
+    fi
+    return 0
+  fi
+  if [ -n "$pid" ] && pid_alive "$pid"; then
+    log "flux-webui: PID ${pid} hidup tapi bukan server.mjs flux-webui; tidak disentuh"
+    return 1
+  fi
+  log "flux-webui: stopped"
+  return 0
+}
+
+case "${1:-}" in
+  start) start_cmd ;;
+  stop) stop_cmd ;;
+  status) status_cmd ;;
+  restart)
+    stop_cmd && start_cmd
+    ;;
+  *)
+    log "usage: flux-web start|stop|status|restart"
+    exit 2
+    ;;
+esac

@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.backup/
+*.log
+.env
+.env.*
+credentials.json
+config.local.*
+*.local.json
