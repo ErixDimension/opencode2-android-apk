@@ -1,0 +1,899 @@
+/* =====================================================================
+   spine-flux.css — SPINE//FLUX design tokens + class catalog (N4)
+   Source of truth: docs/SPEC-DESAIN-N4.md §1 (tabel token), §2 (katalog class)
+   Nilai dikutip persis sesuai spesiasi. [KEPUTUSAN] = Bagian 0 mengikat.
+   ===================================================================== */
+
+/*──────────────────────────────────────────────────────────────────────
+  1. Tabel token (§1) — semua nilai persis
+  ─────────────────────────────────────────────────────────────────────*/
+:root {
+  /* 1.1 Warna permukaan & teks */
+  --fx-bg: #09090b;
+  --fx-surface: #121214;
+  --fx-surface-2: #17171a;
+  --fx-border: rgba(255, 255, 255, 0.07);
+  --fx-text: #f4f4f5;
+  --fx-muted: #a1a1aa;
+  --fx-faint: #63636b;
+
+  /* 1.2 Warna per data-kind (aksen tulang) */
+  --fx-cyan: #7dd3fc;   /* streaming, commands, user */
+  --fx-violet: #c4b5fd; /* riset (research), log */
+  --fx-green: #4ade80;  /* sukses, explored, pass */
+  --fx-red: #f87171;    /* error, stop, hapus */
+  --fx-amber: #fbbf24;  /* thought, warning, limit */
+
+  /* 1.3 Geometri tulang & bentuk */
+  --fx-spine-x: 40px;
+  --fx-node: 14px;
+  --fx-radius: 16px;
+
+  /* 1.4 Gerak */
+  --fx-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --fx-dur: 280ms;
+  --fx-dur-slow: 600ms;
+
+  /* 1.5 Token syntax (slab kode) */
+  --tok-keyword: #c4b5fd;
+  --tok-func: #7dd3fc;
+  --tok-string: #a6f3be;
+  --tok-type: #fbbf24;
+  --tok-tag: #f87171;
+  --tok-comment: #6e7681;
+
+  /* 1.6 Variabel runtime (diisi dari JS) */
+  --fx-progress: 0%;
+  --fx-knot-scale: 1;
+  --ctx: 0%;
+}
+
+/*──────────────────────────────────────────────────────────────────────
+  Gerak global — prefers-reduced-motion mematikan semua animasi (§1.4)
+  ─────────────────────────────────────────────────────────────────────*/
+@media (prefers-reduced-motion: reduce) {
+  .fx-col *,
+  .fx-col *::before,
+  .fx-col *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*──────────────────────────────────────────────────────────────────────
+  2. Katalog class .fx-* (§2)
+  ─────────────────────────────────────────────────────────────────────*/
+
+/* 2.1 Kerangka kolom & tulang */
+.fx-col {
+  height: 100dvh;
+  width: 100vw;
+  max-width: 100vw;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  color: var(--fx-text);
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  background: var(--fx-bg);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.fx-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+}
+
+.fx-spine {
+  position: relative;
+  padding: 12px 12px 20px calc(var(--fx-spine-x) + 28px);
+  width: 100%;
+}
+
+.fx-spine::before {
+  content: "";
+  position: absolute;
+  left: var(--fx-spine-x);
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.10);
+}
+
+.fx-flow {
+  position: absolute;
+  left: var(--fx-spine-x);
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  height: var(--fx-progress);
+  background: linear-gradient(to bottom, var(--fx-cyan), var(--fx-violet), var(--fx-amber));
+  opacity: 0.9;
+  transition: height 0.6s var(--fx-ease);
+  pointer-events: none;
+}
+
+.fx-block {
+  position: relative;
+  margin-bottom: 14px;
+}
+
+.fx-block::before {
+  content: "";
+  position: absolute;
+  left: calc(-28px - var(--fx-node) / 2);
+  top: 6px;
+  width: var(--fx-node);
+  height: var(--fx-node);
+  border: 2px solid var(--fx-faint);
+  border-radius: 50%;
+  background: var(--fx-bg);
+}
+
+.fx-block.is-live::before {
+  box-shadow: 0 0 0 5px rgba(125, 211, 252, 0.15);
+}
+
+/* 2.2 Node per data-kind (§2.2) */
+.fx-block[data-kind="user"]::before,
+.fx-block[data-kind="stream"]::before { border-color: var(--fx-cyan); }
+.fx-block[data-kind="thought"]::before { border-color: var(--fx-amber); }
+.fx-block[data-kind="code"]::before { border-color: var(--fx-green); }
+.fx-block[data-kind="command"]::before { border-color: var(--fx-cyan); }
+.fx-block[data-kind="log"]::before { border-color: var(--fx-violet); }
+.fx-block[data-kind="research"]::before { border-color: var(--fx-violet); }
+.fx-block[data-kind="error"]::before { border-color: var(--fx-red); border-radius: 3px; }
+.fx-block[data-kind="limit"]::before { border-color: var(--fx-amber); }
+.fx-block[data-kind="diff"]::before { border-color: var(--fx-green); }
+.fx-block[data-kind="summary"]::before { border-color: var(--fx-green); }
+.fx-block[data-kind="permission"]::before { border-color: var(--fx-amber); }
+.fx-block[data-kind="delete"]::before { border-color: var(--fx-red); }
+
+/* 2.2b Simpul mata code — eye-knot diganti oleh JS (EyeKnot) di posisi --fx-spine-x */
+.fx-eye-knot { overflow: visible; }
+.fx-eye-knot.is-live { animation: fx-breathe 1.6s ease-in-out infinite; }
+
+/* 2.4b Syntax token (slab kode) */
+.fx-tok.kw { color: var(--tok-keyword); }
+.fx-tok.func { color: var(--tok-func); }
+.fx-tok.str { color: var(--tok-string); }
+.fx-tok.type { color: var(--tok-type); }
+.fx-tok.tag { color: var(--tok-tag); }
+.fx-tok.comment { color: var(--tok-comment); }
+.fx-tok.punct { color: var(--fx-muted); }
+
+/* 2.4c Baris log kelasifikasi (§3.6) */
+.fx-log-line { margin: 1px 0; }
+
+/* 2.3 Blok Thought (§2.3) */
+.fx-thought {
+  position: relative;
+}
+.fx-knot {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--fx-border);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 12px;
+  font-family: ui-monospace, Menlo, monospace;
+  color: var(--fx-text);
+}
+.fx-knot-svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+.fx-knot-svg circle {
+  fill: none;
+  stroke: var(--fx-amber);
+  stroke-width: 2;
+  transform-origin: center;
+  transition: transform 0.28s var(--fx-ease), stroke 0.28s var(--fx-ease);
+}
+.fx-thought.is-open .fx-knot-svg circle {
+  transform: rotate(90deg);
+}
+.fx-thought.is-live .fx-knot-svg {
+  animation: fx-breathe 1.6s ease-in-out infinite;
+}
+.fx-thought-body {
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 0.28s var(--fx-ease);
+}
+.fx-thought.is-open .fx-thought-body {
+  max-height: 2000px;
+}
+
+/* 2.4 Blok kerja (§2.4) */
+.fx-stream-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 1em;
+  background: var(--fx-cyan);
+  animation: fx-blink 1s steps(1) infinite;
+  vertical-align: middle;
+  margin-left: 2px;
+}
+.fx-line-active {
+  background: rgba(125, 211, 252, 0.10);
+}
+.fx-cmd-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 10px;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 12.5px;
+  background: var(--fx-surface);
+  border-radius: 12px;
+  margin-bottom: 6px;
+  border: 1px solid var(--fx-border);
+}
+.fx-cmd-state {
+  margin-left: auto;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.fx-spin {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--fx-border);
+  border-top-color: var(--fx-cyan);
+  border-radius: 50%;
+  animation: fx-rot 0.9s linear infinite;
+}
+
+/* 2.5 Blok gangguan (§2.5) */
+.fx-limit {
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  background: rgba(251, 191, 36, 0.06);
+  border-radius: var(--fx-radius);
+  padding: 12px;
+  margin-bottom: 14px;
+}
+.fx-limit-ring {
+  width: 44px;
+  height: 44px;
+  display: block;
+}
+.fx-limit-ring circle {
+  fill: none;
+  stroke: var(--fx-amber);
+  stroke-width: 3;
+  stroke-dasharray: 110;
+  stroke-dashoffset: 110;
+  transform: rotate(-90deg);
+  transform-origin: center;
+  animation: fx-limit-sweep 1s linear infinite;
+}
+@keyframes fx-limit-sweep {
+  to { stroke-dashoffset: 0; }
+}
+.fx-edit-old {
+  color: #f8a5a5;
+  text-decoration: line-through;
+  text-decoration-color: var(--fx-red);
+}
+.fx-edit-new {
+  background: rgba(74, 222, 128, 0.16);
+  color: #aef5c3;
+}
+.fx-attempt-collapsed {
+  opacity: 0.55;
+  filter: saturate(0.3);
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11.5px;
+  color: var(--fx-muted);
+}
+
+/* 2.6 Blok penutup & copy (§2.6) */
+.fx-helix {
+  width: 100%;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.fx-helix svg {
+  flex: 1;
+  height: 24px;
+  color: var(--fx-faint);
+}
+.fx-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  font-family: ui-monospace, Menlo, monospace;
+  color: var(--fx-muted);
+  border: 1px solid var(--fx-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+}
+.fx-copy-btn.is-copied {
+  color: var(--fx-green);
+  border-color: rgba(74, 222, 128, 0.5);
+}
+.fx-toast {
+  position: sticky;
+  top: 8px;
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(22, 46, 30, 0.95);
+  border: 1px solid rgba(74, 222, 128, 0.5);
+  color: var(--fx-text);
+  font-size: 13px;
+  animation: fx-toast-in var(--fx-dur) var(--fx-ease);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.fx-sheet {
+  position: sticky;
+  bottom: env(safe-area-inset-bottom, 0);
+  z-index: 55;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto 12px;
+  padding: 14px 16px;
+  border-radius: var(--fx-radius);
+  border: 1px solid var(--fx-border);
+  background: var(--fx-surface);
+  color: var(--fx-text);
+  font-size: 13px;
+  font-family: ui-monospace, Menlo, monospace;
+  line-height: 1.5;
+  animation: fx-sheet-in var(--fx-dur) var(--fx-ease);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
+  overflow-y: auto;
+  max-height: 30vh;
+}
+
+/* 2.7 Composer (§2.7) */
+.fx-composer {
+  position: sticky;
+  top: auto;
+  bottom: env(safe-area-inset-bottom, 0);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--fx-surface-2);
+  border-top: 1px solid var(--fx-border);
+}
+.fx-composer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  height: var(--ctx);
+  bottom: 0;
+  background: rgba(56, 150, 190, 0.28);
+  transition: width 0.8s var(--fx-ease), background 0.28s var(--fx-ease);
+  pointer-events: none;
+  z-index: 0;
+}
+.fx-composer[data-ctx-high="true"]::after {
+  background: rgba(180, 83, 9, 0.35);
+}
+.fx-composer > * {
+  position: relative;
+  z-index: 1;
+}
+.fx-composer-inner {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  border-radius: 20px;
+  border: 1px solid var(--fx-border);
+  background: var(--fx-surface);
+  padding: 8px 12px;
+}
+.fx-composer.is-editing .fx-composer-inner {
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  background: #181207;
+}
+.fx-textarea {
+  flex: 1;
+  min-height: 24px;
+  max-height: 120px;
+  resize: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--fx-text);
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 1.5;
+  overflow-y: auto;
+}
+.fx-model-pill {
+  font-size: 12px;
+  font-family: ui-monospace, Menlo, monospace;
+  color: var(--fx-muted);
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--fx-border);
+  background: rgba(255, 255, 255, 0.03);
+}
+.fx-ctx-label {
+  font-size: 12px;
+  font-family: ui-monospace, Menlo, monospace;
+  color: var(--fx-muted);
+}
+.fx-stop {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: var(--fx-red);
+  color: #0b0b0c;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.fx-stop:disabled { opacity: 0.5; cursor: not-allowed; }
+.fx-send {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: var(--fx-cyan);
+  color: #0b0b0c;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.fx-send:disabled { opacity: 0.5; cursor: not-allowed; }
+.fx-edit-bar {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12px;
+  font-family: ui-monospace, Menlo, monospace;
+}
+.fx-edit-bar button {
+  border: 1px solid var(--fx-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--fx-text);
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.fx-edit-bar button:first-child { border-color: var(--fx-amber); color: var(--fx-amber); }
+.fx-edit-bar button:nth-child(2) { border-color: var(--fx-red); color: var(--fx-red); }
+
+/*─── Dimensi sumber literal (§1.8) ───*/
+.fx-line-active { position: relative; }
+
+/* 40px stick threshold & internal slabs */
+.fx-stick-region { position: sticky; top: 40px; }
+
+/*──────────────────────────────────────────────────────────────────────
+  Keputusan Finalisasi Bagian 0 — class baru
+  ─────────────────────────────────────────────────────────────────────*/
+
+/* 0.1 Daftar sesi — .fx-drawer (laci geser kiri) */
+.fx-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+}
+.fx-drawer__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+}
+.fx-drawer__panel {
+  position: relative;
+  width: min(320px, 92vw);
+  max-width: 92vw;
+  background: var(--fx-surface);
+  border-right: 1px solid var(--fx-border);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 8px 0 24px rgba(0, 0, 0, 0.4);
+}
+.fx-drawer__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--fx-border);
+}
+.fx-drawer__title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fx-text);
+}
+.fx-drawer__title span { color: var(--fx-muted); font-weight: 400; text-transform: none; font-size: 11px; }
+.fx-drawer__list { flex: 1; overflow-y: auto; }
+.fx-session-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  font-size: 13px;
+}
+.fx-session-row:hover { background: rgba(255, 255, 255, 0.04); }
+.fx-session-row[data-active="true"] {
+  background: rgba(125, 211, 252, 0.08);
+  border-left: 3px solid var(--fx-cyan);
+}
+.fx-session-row__title { font-weight: 600; color: var(--fx-text); }
+.fx-session-row__meta { color: var(--fx-muted); font-size: 11.5px; font-family: ui-monospace, Menlo, monospace; }
+.fx-new-session {
+  width: 100%;
+  padding: 12px 16px;
+  border-top: 1px solid var(--fx-border);
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--fx-cyan);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fx-new-session:hover { background: rgba(125, 211, 252, 0.06); }
+
+/* 0.1 corner button — tombol bulat melayang kiri atas kolom */
+.fx-corner-btn {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--fx-border);
+  background: var(--fx-surface);
+  color: var(--fx-text);
+  cursor: pointer;
+  margin: 8px 0 8px 4px;
+}
+.fx-corner-btn:hover { border-color: var(--fx-cyan); }
+.fx-corner-btn__dot {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--fx-bg);
+  background: var(--fx-red);
+}
+.fx-corner-btn__dot.online { background: var(--fx-green); }
+
+/* 0.3 Permission block */
+.fx-permission {
+  border: 1px solid var(--fx-border);
+  background: rgba(251, 191, 36, 0.08);
+  border-radius: var(--fx-radius);
+  padding: 12px;
+  margin-bottom: 14px;
+}
+.fx-permission.is-live {
+  animation: fx-breathe 1.6s ease-in-out infinite;
+}
+.fx-permission__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.fx-permission__tag {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fx-amber);
+}
+.fx-permission__tool {
+  font-size: 12.5px;
+  font-family: ui-monospace, Menlo, monospace;
+  color: var(--fx-text);
+}
+.fx-permission__summary {
+  font-size: 12.5px;
+  font-family: ui-monospace, Menlo, monospace;
+  color: var(--fx-muted);
+  white-space: pre-wrap;
+  margin-bottom: 8px;
+}
+.fx-permission__result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-family: ui-monospace, Menlo, monospace;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+.fx-permission__result.allowed { background: rgba(74, 222, 128, 0.12); color: var(--fx-green); border: 1px solid rgba(74, 222, 128, 0.35); }
+.fx-permission__result.rejected { background: rgba(248, 113, 113, 0.12); color: var(--fx-red); border: 1px solid rgba(248, 113, 113, 0.35); }
+.fx-permission-actions {
+  display: flex;
+  gap: 8px;
+}
+.fx-permission-actions button {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+.fx-permission-actions button.allow {
+  background: var(--fx-green);
+  color: #0b0b0c;
+}
+.fx-permission-actions button.reject {
+  background: var(--fx-red);
+  color: #0b0b0c;
+}
+.fx-permission-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* 0.7 Named elements without class */
+.fx-jump-latest {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  font-family: ui-monospace, Menlo, monospace;
+  color: var(--fx-cyan);
+  border: 1px solid rgba(125, 211, 252, 0.35);
+  border-radius: 8px;
+  background: rgba(125, 211, 252, 0.05);
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+.fx-jump-latest:hover { background: rgba(125, 211, 252, 0.12); }
+.fx-stopped-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 11.5px;
+  font-family: ui-monospace, Menlo, monospace;
+  color: var(--fx-red);
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  border-radius: 8px;
+  background: rgba(248, 113, 113, 0.08);
+  margin-bottom: 10px;
+}
+.fx-edited-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--fx-green);
+  border: 1px solid rgba(74, 222, 128, 0.35);
+  border-radius: 999px;
+  background: rgba(74, 222, 128, 0.08);
+  margin-left: 6px;
+}
+.fx-fallback-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  font-family: ui-monospace, Menlo, monospace;
+  color: var(--fx-green);
+  background: rgba(74, 222, 128, 0.08);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+.fx-seal {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-family: ui-monospace, Menlo, monospace;
+  margin: 6px 0;
+}
+.fx-seal__ring {
+  width: 26px;
+  height: 26px;
+  display: block;
+}
+.fx-seal__ring circle {
+  fill: none;
+  stroke: var(--fx-border);
+  stroke-width: 3;
+}
+.fx-seal.pass .fx-seal__ring circle { stroke: var(--fx-green); }
+.fx-seal.fail .fx-seal__ring circle { stroke: var(--fx-red); }
+.fx-load-older {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  font-family: ui-monospace, Menlo, monospace;
+  color: var(--fx-cyan);
+  border: 1px solid rgba(125, 211, 252, 0.35);
+  border-radius: 8px;
+  background: rgba(125, 211, 252, 0.05);
+  cursor: pointer;
+  width: -webkit-fill-available;
+}
+.fx-load-older:hover { background: rgba(125, 211, 252, 0.12); }
+
+/* 0.8 Blok Akses — gerbang */
+.fx-gate {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  width: 100vw;
+  overflow: hidden;
+  background: var(--fx-bg);
+  color: var(--fx-text);
+}
+.fx-gate__spine {
+  position: relative;
+  width: 100%;
+  flex: 1;
+  padding-left: calc(var(--fx-spine-x) + 10px);
+}
+.fx-gate__spine::before {
+  content: "";
+  position: absolute;
+  left: var(--fx-spine-x);
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.10);
+}
+.fx-gate__node {
+  position: absolute;
+  left: calc(var(--fx-spine-x) - 7px);
+  top: 18px;
+  width: var(--fx-node);
+  height: var(--fx-node);
+  border: 2px solid var(--fx-cyan);
+  border-radius: 50%;
+  background: var(--fx-bg);
+  box-shadow: 0 0 0 5px rgba(125, 211, 252, 0.25);
+}
+.fx-gate__screen {
+  position: relative;
+  padding: 24px 16px 12px;
+}
+.fx-gate__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  background: rgba(251, 191, 36, 0.1);
+  color: var(--fx-amber);
+  margin-bottom: 14px;
+}
+.fx-gate__card {
+  border: 1px solid var(--fx-border);
+  background: var(--fx-surface);
+  border-radius: var(--fx-radius);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.fx-gate__card__label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fx-cyan);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fx-gate__meter {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  margin-top: 10px;
+}
+.fx-gate-seg {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--fx-border);
+}
+.fx-gate-seg.filled { background: var(--fx-cyan); border-color: var(--fx-cyan); }
+.fx-gate__sub {
+  font-size: 11.5px;
+  color: var(--fx-faint);
+  font-family: ui-monospace, Menlo, monospace;
+  margin-top: 6px;
+}
+.fx-gate__footer {
+  margin-top: auto;
+  padding: 14px 16px;
+  border-top: 1px solid var(--fx-border);
+  background: var(--fx-surface);
+}
+.fx-chain {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11.5px;
+  font-family: ui-monospace, Menlo, monospace;
+  color: var(--fx-muted);
+}
+.fx-chain-node {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fx-green);
+}
+.fx-chain-node dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.fx-chain-node.off { color: var(--fx-faint); }
+
+/*──────────────────────────────────────────────────────────────────────
+  Keyframes (§2.9)
+  ─────────────────────────────────────────────────────────────────────*/
+@keyframes fx-blink { to { opacity: 0; } }
+@keyframes fx-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+@keyframes fx-rot { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes fx-toast-in {
+  from { transform: translateY(-8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes fx-sheet-in {
+  from { transform: translateY(16px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}

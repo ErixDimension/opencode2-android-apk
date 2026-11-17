@@ -1,0 +1,72 @@
+// ChatColumn.tsx — §4.3: .fx-col > .fx-scroll > .fx-spine > .fx-flow + blok-blok.
+// Event SSE tidak dirender langsung; REST via sessionStore adalah kebenaran.
+
+import * as React from 'react'
+import { useEffect, useRef } from 'react'
+import { RenderBlock } from './blocks'
+import { Composer } from './Composer'
+import { sessionStore } from '../lib/sessionStore'
+import { replyPermission } from '../lib/apiClient'
+
+export function ChatColumn() {
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  const onPermissionReply = (reply: 'accept' | 'reject') => {
+    const state = sessionStore.getState()
+    const pending = state.blocks.find((b) => b.kind === 'permission' && (b.payload as { status?: string }).status === 'pending')
+    if (!pending) return
+    const requestID = (pending.payload as { requestID?: string }).requestID
+    if (requestID && state.active) replyPermission(state.active.id, requestID, reply)
+  }
+
+  useEffect(() => {
+    const unsub = sessionStore.subscribe(() => {
+      if (sessionStore.getState().activeRun && scrollRef.current) {
+        const el = scrollRef.current
+        if (el.scrollHeight - el.scrollTop - el.clientHeight < 80) el.scrollTop = el.scrollHeight
+      }
+    })
+    return () => unsub()
+  }, [])
+
+  const loadOlder = () => { sessionStore.loadOlder() }
+
+  const state = sessionStore.getState()
+  const active = state.active
+
+  if (!active) {
+    return (
+      <div className="fx-col">
+        <div className="fx-scroll">
+          <div className="fx-spine">
+            <div className="fx-block" data-kind="stream">
+              <div className="text-slate-500 font-mono text-sm">Belum ada sesi. Buka laci (tombol sudut kiri atas) dan pilih atau buat sesi baru.</div>
+            </div>
+          </div>
+        </div>
+        <Composer />
+      </div>
+    )
+  }
+
+  return (
+    <div className="fx-col">
+      <div className="fx-scroll" ref={scrollRef}>
+        <div className="fx-spine">
+          <div className="fx-flow" style={{ height: `var(--fx-progress)` }} />
+          {state.blocks.map((block) => (
+            <React.Fragment key={block.id}>
+              <RenderBlock block={block} onPermissionReply={onPermissionReply} />
+            </React.Fragment>
+          ))}
+          {state.cursor?.next && (
+            <div className="flex justify-center mb-6">
+              <button className="fx-load-older" onClick={loadOlder}>Muat lebih lama</button>
+            </div>
+          )}
+        </div>
+      </div>
+      <Composer />
+    </div>
+  )
+}
