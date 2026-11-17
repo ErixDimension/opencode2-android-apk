@@ -1,10 +1,14 @@
 // SessionList.tsx — §7.2: daftar sesi yang meluncur turun dari .fx-sessionbar
 // (transisi geser 300ms), bergulir di dalam kolomnya sendiri.
-import { useCallback } from 'react'
+// §8.5 — tombol di kepala daftar membuka daftar Izin tersimpan (read-only;
+// cabut aturan belum terbukti upstream, lihat laporan N4.4.1 butir 3).
+import { useCallback, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { sessionStore } from '../lib/sessionStore'
 import { useSessionStore } from '../lib/useSessionStore'
+import { getPermissionSaved } from '../lib/apiClient'
 import { SessionCard } from './SessionCard'
+import { PermissionSavedList } from './PermissionSavedList'
 
 interface Props {
   onClose: () => void
@@ -13,6 +17,17 @@ interface Props {
 
 export function SessionList({ onClose, onNew }: Props) {
   const state = useSessionStore()
+  const [savedOpen, setSavedOpen] = useState(false)
+  const [savedRules, setSavedRules] = useState<{ id: string; action: string; resource: string; effect?: string }[] | null>(null)
+
+  const loadSavedRules = useCallback(async () => {
+    try {
+      const rules = await getPermissionSaved()
+      setSavedRules(rules)
+    } catch {
+      setSavedRules([])
+    }
+  }, [])
 
   const handleSelect = useCallback((sessionID: string) => {
     void sessionStore.setActive(sessionID)
@@ -40,6 +55,12 @@ export function SessionList({ onClose, onNew }: Props) {
       <div className="fx-session-list__head">
         <span className="fx-session-list__title">Daftar <span>sesi</span></span>
         <span className="fx-session-list__count">{state.sessions.length} sesi</span>
+        <button
+          type="button"
+          onClick={() => { void loadSavedRules(); setSavedOpen(true) }}
+        >
+          Izin tersimpan
+        </button>
       </div>
       <div className="fx-session-list__scroll">
         {state.sessions.length === 0 ? (
@@ -52,7 +73,8 @@ export function SessionList({ onClose, onNew }: Props) {
               activeID={state.active?.id ?? null}
               activeRun={state.activeRun}
               contextLimit={state.modelContextLimit}
-              hasAlert={state.pendingPermission?.sessionID === s.id}
+              isBusy={state.sessionBusy[s.id] ?? false}
+              hasAlert={state.pendingPermission?.some((p) => p.sessionID === s.id) ?? false}
               onSelect={handleSelect}
               onDelete={handleDelete}
               onRename={handleRename}
@@ -81,6 +103,16 @@ export function SessionList({ onClose, onNew }: Props) {
               Muat ulang daftar sesi
             </button>
           </div>
+        )}
+        {savedOpen && (
+          <>
+            <div className="fx-sessionlist-backdrop" onClick={() => setSavedOpen(false)} />
+            <PermissionSavedList
+              open={savedOpen}
+              rules={savedRules ?? []}
+              onClose={() => setSavedOpen(false)}
+            />
+          </>
         )}
       </div>
     </div>

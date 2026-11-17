@@ -1551,3 +1551,70 @@
   font-family: ui-monospace, Menlo, monospace;
   animation: fx-breathe 1.6s ease-in-out infinite;
 }
+
+/* 8.5 — daftar Izin tersimpan (read-only) */
+.fx-permission-saved-list {
+  width: 420px;
+  max-width: 92vw;
+  max-height: 72vh;
+  display: flex;
+  flex-direction: column;
+}
+.fx-permission-saved-list__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--fx-border);
+}
+.fx-permission-saved-list__title {
+  font-weight: 700;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 15px;
+}
+.fx-permission-saved-list__title span { color: var(--fx-cyan); }
+.fx-permission-saved-list__body {
+  overflow: auto;
+  padding: 10px 14px;
+}
+.fx-permission-saved-list__note {
+  font-size: 11.5px;
+  color: var(--fx-muted);
+  font-family: ui-monospace, Menlo, monospace;
+  margin-bottom: 8px;
+}
+.fx-permission-saved-list__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-family: ui-monospace, Menlo, monospace;
+}
+.fx-permission-saved-list__table th {
+  text-align: left;
+  font-weight: 700;
+  color: var(--fx-text);
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--fx-border);
+  white-space: nowrap;
+}
+.fx-permission-saved-list__table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(161, 161, 170, 0.15);
+  vertical-align: top;
+}
+.fx-permission-saved-list__id { color: var(--fx-muted); max-width: 150px; }
+.fx-permission-saved-list__action { font-weight: 700; }
+.fx-permission-saved-list__resource { max-width: 200px; overflow-wrap: break-word; }
+.fx-permission-saved-list__row--wildcard .fx-permission-saved-list__kind {
+  color: var(--fx-red);
+}
+.fx-permission-saved-list__kind {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.fx-permission-saved-list__empty {
+  text-align: center;
+  color: var(--fx-muted);
+  padding: 14px 8px;
+}

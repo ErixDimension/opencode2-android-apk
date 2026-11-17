@@ -5,13 +5,14 @@
 // gagal), model (§7.7 — degradasi jujur: tidak ada endpoint ganti model upstream).
 import { useState, useCallback } from 'react'
 import { Edit2, Trash2 } from 'lucide-react'
-import { type SessionView } from '../lib/sessionStore'
+import { sessionStore, type SessionView } from '../lib/sessionStore'
 
 interface Props {
   session: SessionView
   activeID: string | null
   activeRun: boolean
   contextLimit: number | null
+  isBusy: boolean
   hasAlert: boolean
   onSelect: (sessionID: string) => void
   onDelete: (sessionID: string) => Promise<void>
@@ -46,13 +47,15 @@ export function SessionCard({
   activeID,
   activeRun,
   contextLimit,
+  isBusy,
   hasAlert,
   onSelect,
   onDelete,
   onRename,
 }: Props) {
   const isActive = activeID === session.id
-  const run = isActive && activeRun
+  // §7.3/7.4 — sesi LATAR yang busy (dari event session.*) juga tampil "Sedang bekerja".
+  const run = isBusy || (isActive && activeRun)
   const tokens = session.tokens
   const tokenTotal = tokens ? tokens.input + tokens.output + tokens.reasoning : null
   const contextPct =
@@ -141,11 +144,6 @@ export function SessionCard({
               )}
               {session.updatedAt ? ` · ${relativeTime(session.updatedAt)}` : ''}
             </span>
-            {session.model?.id && (
-              <span className="fx-session-card__meta" style={{ fontSize: '11px' }}>
-                (ketuk model: ganti tidak didukung server)
-              </span>
-            )}
           </>
         )}
         {renaming && (
@@ -171,13 +169,24 @@ export function SessionCard({
       {run && <div className="fx-session-card__sweep" aria-hidden="true" />}
       <div className="fx-session-card__actions">
         {!run && (
-          <button
-            type="button"
-            title="Ganti nama judul sesi"
-            onClick={(e) => { e.stopPropagation(); setRenaming(true); setModelError(null) }}
-          >
-            <Edit2 size={16} />
-          </button>
+          <>
+            <button
+              type="button"
+              title="Ganti nama judul sesi"
+              onClick={(e) => { e.stopPropagation(); setRenaming(true); setModelError(null) }}
+            >
+              <Edit2 size={16} />
+            </button>
+            {isActive && (
+              <button
+                type="button"
+                title="Buka statistik sesi"
+                onClick={(e) => { e.stopPropagation(); sessionStore.openUsageSheet() }}
+              >
+                Statistik sesi
+              </button>
+            )}
+          </>
         )}
         <button
           type="button"

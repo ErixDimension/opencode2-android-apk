@@ -422,12 +422,40 @@ async function main() {
     const savedJ = jsonSafe(saved.body)
     assert('H13 GET /api/permission/saved → 200 (aturan izin tersimpan)', saved.status === 200 && Array.isArray(savedJ?.data), `status ${saved.status}, aturan=${Array.isArray(savedJ?.data) ? savedJ.data.length : '-'}`)
 
+    // ================= N4.4.1: H14-H15 =================
+
+    // ---- H14: renameSession memeriksa status updateSession (bukan ok:true
+    //          sepihak) + UsageSheet width string persen ----
+    const storeSrc = readFileRel('src/lib/sessionStore.ts')
+    const h14RenameStatus = storeSrc.includes('if (!res.ok)') && storeSrc.includes('Gagal mengganti judul (server ${res.status})')
+    const usageSrc2 = readFileRel('src/components/UsageSheet.tsx')
+    const h14UsagePct = usageSrc2.includes('${pct}%')
+    assert(
+      'H14 renameSession memeriksa status hasil updateSession (tidak ok:true tanpa syarat)',
+      h14RenameStatus,
+      `renameStatus=${h14RenameStatus}`
+    )
+    assert('H14 UsageSheet width string persen (`${pct}%`)', h14UsagePct, `widthPct=${h14UsagePct}`)
+
+    // ---- H15: daftar Izin tersimpan ter-wire ke getPermissionSaved dari
+    //          komponen daftar sesi; antre permission tidak lagi literal 1 dari {1} ----
+    const listSrc2 = readFileRel('src/components/SessionList.tsx')
+    const permSrc2 = readFileRel('src/components/PermissionSheet.tsx')
+    const h15SavedWired = listSrc2.includes('getPermissionSaved') && listSrc2.includes('PermissionSavedList')
+    const h15QueueReal = !permSrc2.includes('1 dari {1}') && permSrc2.includes('dari ${')
+    assert(
+      'H15 daftar Izin tersimpan ter-wire ke getPermissionSaved dari SessionList',
+      h15SavedWired,
+      `savedWired=${h15SavedWired}`
+    )
+    assert('H15 antre permission bukan literal 1 dari {1}', h15QueueReal, `queueReal=${h15QueueReal}`)
+
   } finally {
     adapter.kill()
     cleanup()
   }
 
-  log(`HASIL: ${failures === 0 ? 'SEMUA PASS (H0-H13)' : failures + ' ASSERTION GAGAL'}`)
+  log(`HASIL: ${failures === 0 ? 'SEMUA PASS (H0-H15)' : failures + ' ASSERTION GAGAL'}`)
   process.exit(failures === 0 ? 0 : 1)
 }
 

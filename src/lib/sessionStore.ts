@@ -38,8 +38,10 @@ export interface StoreState {
   contextPercent: number | null
   modelLabel: string
   activeRun: boolean
+  sessionBusy: Record<string, boolean>
+  usageOpen: boolean
   permissionOpen: boolean
-  pendingPermission: { requestID: string; sessionID: string; tool: string; input: string } | null
+  pendingPermission: { requestID: string; sessionID: string; tool: string; input: string }[]
   permissionResult: { kind: 'once' | 'always' | 'reject' | 'expired'; tool: string } | null
 }
 
@@ -57,8 +59,10 @@ const initialState: StoreState = {
   contextPercent: null,
   modelLabel: '',
   activeRun: false,
+  sessionBusy: {},
+  usageOpen: false,
   permissionOpen: false,
-  pendingPermission: null,
+  pendingPermission: [],
   permissionResult: null,
 }
 
@@ -101,6 +105,24 @@ export class SessionStore {
           ? envelope.sessionID
           : ''
 
+      // §7.3/7.4 — penanda busy per SESI (bukan hanya aktif) dari event session.*,
+      // supaya sesi latar yang bekerja juga tampil "Sedang bekerja" di daftar.
+      // Upstream tidak menyediakan field status pada record sesi (proses discovery),
+      // jadi event SSE adalah satu-satunya sinyal; tanpa event → idle (jujur).
+      const isBusyStart =
+        type === 'session.execution.started' || type === 'session.step.started' || type === 'session.text.started'
+      const isBusyEnd =
+        type === 'session.execution.succeeded' || type === 'session.execution.failed' ||
+        type === 'session.step.ended' || type === 'session.text.ended'
+      if (sessionID && (isBusyStart || isBusyEnd)) {
+        this.#set({
+          sessionBusy: { ...this.#state.sessionBusy, [sessionID]: isBusyStart },
+        })
+        const activeID = this.#state.active?.id
+        if (sessionID === activeID) this.#requestRefetch('busy-idle')
+        return
+      }
+
       const activeID = this.#state.active?.id
       if (!sessionID || sessionID !== activeID) return
 
@@ -118,15 +140,10 @@ export class SessionStore {
         if (requestID || tool) {
           this.#set({
             permissionOpen: true,
-            pendingPermission: { requestID, sessionID, tool, input },
+            pendingPermission: [{ requestID, sessionID, tool, input }],
+            permissionResult: null,
           })
         }
-        return
-      }
-      if (type === 'session.execution.started' || type === 'session.execution.succeeded' ||
-          type === 'session.step.started' || type === 'session.step.ended' ||
-          type === 'session.text.started' || type === 'session.text.ended') {
-        this.#requestRefetch('busy-idle')
         return
       }
     })
@@ -321,14 +338,14 @@ export class SessionStore {
   }
 
   /*────────────────────────────────────────────────────────────────────
-    Lembar izin (§8.1)
+    Lembar izin (§8.1): pendingPermission sekarang antre (array).
   ─────────────────────────────────────────────────────────────────────*/
-  openPermissionSheet(pending: { requestID: string; sessionID: string; tool: string; input: string }): void {
+  openPermissionSheet(pending: { requestID: string; sessionID: string; tool: string; input: string }[]): void {
     this.#set({ permissionOpen: true, pendingPermission: pending, permissionResult: null })
   }
 
   closePermissionSheet(): void {
-    this.#set({ permissionOpen: false, pendingPermission: null, permissionResult: null })
+    this.#set({ permissionOpen: false, pendingPermission: [], permissionResult: null })
   }
 
   setPermissionResult(kind: 'once' | 'always' | 'reject' | 'expired', tool: string): void {
@@ -336,21 +353,31 @@ export class SessionStore {
   }
 
   /*────────────────────────────────────────────────────────────────────
+    Lempar statistik sesi (§7.10 — dibuka dari Underbar atau kartu aktif).
+  ─────────────────────────────────────────────────────────────────────*/
+  openUsageSheet(): void {
+    this.#set({ usageOpen: true })
+  }
+
+  closeUsageSheet(): void {
+    this.#set({ usageOpen: false })
+  }
+
+  /*────────────────────────────────────────────────────────────────────
     Hapus sesi (§7.6): interrupt dulu bila sesi aktif sedang berjalan,
-    baru DELETE; tidak pernah diam-diam gagal.
+    baru DELETE; tidak pernah diam-diam gagal. Status non-204 dicatat
+    ke sessionsError (tidak disamarkan sebagai sukses).
   ─────────────────────────────────────────────────────────────────────*/
   async removeSession(id: string): Promise<void> {
     const isActive = this.#state.active?.id === id
     if (isActive && this.#state.activeRun) {
       await this.interrupt()
     }
-    try {
-      await deleteSession(id)
-    } catch (err) {
-      this.#set({
-        sessionsError: err instanceof Error ? err.message : 'Gagal menghapus sesi.',
-      })
-      throw err
+    const res = await deleteSession(id)
+    if (!res.ok || res.status !== 204) {
+      const msg = `Gagal menghapus sesi (server ${res.status}).`
+      this.#set({ sessionsError: msg })
+      throw new Error(msg)
     }
     await this.loadSessions()
     if (isActive) {
@@ -365,7 +392,12 @@ export class SessionStore {
   ─────────────────────────────────────────────────────────────────────*/
   async renameSession(id: string, title: string): Promise<{ ok: boolean; error?: string }> {
     try {
-      await updateSession(id, { title })
+      const res = await updateSession(id, { title })
+      if (!res.ok) {
+        // §7.5 — PATCH /api/session/:id → 404 upstream: degradasi jujur,
+        // jangan berpura-pura tersimpan. Chip error di SessionCard tampil.
+        return { ok: false, error: `Gagal mengganti judul (server ${res.status}).` }
+      }
       return { ok: true }
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : 'Gagal mengganti judul.' }

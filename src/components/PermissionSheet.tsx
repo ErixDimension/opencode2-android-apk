@@ -1,10 +1,11 @@
 // PermissionSheet.tsx — §8.1: popup izin tool (auto) dengan 3 tombol:
 // ALLOW ONCE / ALWAYS ALLOW / REJECT. Cakupan Always ditampilkan sebelum tekan.
-// Antrean global: indikator "1 dari N". Hasil: ✓ Diizinkan sekali / Selalu
-// diizinkan / ✗ Ditolak — <tool>. Kedaluwarsa ditampilkan apa adanya.
+// Antrean global: indikator "i dari N" yang nyata (bukan angka karangan).
+// Hasil: ✓ Diizinkan sekali / Selalu diizinkan / ✗ Ditolak — <tool>.
+// Kedaluwarsa ditampilkan apa adanya.
 // Catatan: permission.asked tidak pernah nyala live (aturan wildcard :*:*:
-// auto-approve, Latarangan 8.5) — lembar ini infrastruktur UI; pemicu live
-// ditunggu bukti upstream. Reject payload {"reply":"reject"} belum diuji live.
+// auto-approve, Latarangan 8.5) — lembar ini infrastruktur UI. pendingPermission
+// sekarang antre agar siap N permintaan bersamaan jika upstream mengirimnya.
 interface Pending {
   requestID: string
   tool: string
@@ -13,15 +14,22 @@ interface Pending {
 
 interface Props {
   open: boolean
-  pending: Pending | null
+  pending: Pending[] | null
   result: { kind: 'once' | 'always' | 'reject' | 'expired'; tool: string } | null
   onReply: (reply: 'accept' | 'reject' | 'always' | 'once') => void
+}
+
+function truncate(s: string, n = 120): string {
+  if (s == null) return ''
+  return s.length > n ? s.slice(0, n) + '…' : s
 }
 
 export function PermissionSheet({ open, pending, result, onReply }: Props) {
   if (!open) return null
 
   const answered = result != null
+  const head = pending != null && pending.length > 0 ? pending[0] : null
+  const queueTotal = pending != null ? pending.length : 0
 
   return (
     <div className="fx-permission-sheet" role="dialog" aria-modal="true" aria-label="Izinkan izin tool" onClick={(e) => e.stopPropagation()}>
@@ -29,22 +37,24 @@ export function PermissionSheet({ open, pending, result, onReply }: Props) {
         <span className="fx-permission-sheet__node" aria-hidden="true" />
         <div>
           <span className="fx-permission-sheet__title">Izinkan <span>izin tool</span></span>
-          <span className="fx-permission-sheet__session">{pending?.tool ?? '—'}</span>
+          <span className="fx-permission-sheet__session">{head?.tool ?? '—'}</span>
         </div>
       </div>
       <div className="fx-permission-sheet__body">
-        {pending && (
+        {head && (
           <>
-            <span className="fx-permission-sheet__tool">{pending.tool}</span>
-            <div className="fx-permission-sheet__input">{pending.input}</div>
+            <span className="fx-permission-sheet__tool">{head.tool}</span>
+            <div className="fx-permission-sheet__input">{truncate(head.input)}</div>
             <div className="fx-permission-sheet__scope">
-              Cakupan Always: tool + pola path perintah sesuai data upstream (ditampilkan sebelum tekan).
+              Cakupan Always: {head.tool} + {truncate(head.input)} (ditampilkan sebelum tekan).
             </div>
-            <div className="fx-permission-sheet__queue">1 dari {1}</div>
+            <div className="fx-permission-sheet__queue">
+              {queueTotal > 0 ? `1 dari ${queueTotal}` : 'antre kosong'}
+            </div>
           </>
         )}
       </div>
-      {!answered && pending ? (
+      {!answered && head ? (
         <div className="fx-permission-actions">
           <button type="button" className="allow-once" onClick={() => onReply('once')} title="Izinkan sekali">
             ALLOW ONCE

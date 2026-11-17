@@ -6,6 +6,7 @@ import { SessionBar } from './SessionBar'
 import { SessionList } from './SessionList'
 import { NewSessionDialog } from './NewSessionDialog'
 import { PermissionSheet } from './PermissionSheet'
+import { UsageSheet } from './UsageSheet'
 import { sessionStore } from '../lib/sessionStore'
 import { useSessionStore } from '../lib/useSessionStore'
 
@@ -52,14 +53,22 @@ export function Shell() {
             pending={state.pendingPermission}
             result={state.permissionResult}
             onReply={(reply) => {
-              const requestID = state.pendingPermission?.requestID
-              const tool = state.pendingPermission?.tool ?? 'tool'
+              const head = state.pendingPermission?.[0]
+              const requestID = head?.requestID
+              const tool = head?.tool ?? 'tool'
               if (!requestID) return
               void sessionStore.replyPermission(requestID, reply).then(() => {
                 sessionStore.setPermissionResult(reply === 'accept' ? 'once' : reply, tool)
               })
             }}
           />
+        </>
+      )}
+
+      {state.usageOpen && (
+        <>
+          <div className="fx-usage-backdrop" onClick={() => sessionStore.closeUsageSheet()} />
+          <UsageSheet onClose={() => sessionStore.closeUsageSheet()} />
         </>
       )}
     </div>

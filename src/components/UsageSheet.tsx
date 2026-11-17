@@ -73,7 +73,7 @@ export function UsageSheet({ onClose }: Props) {
             </span>
           </div>
           <div className="fx-usage-sheet__bar">
-            <div className={`fx-usage-sheet__bar-fill ${ctxClass(pct)}`} style={{ width: pct != null ? pct : 0 }} />
+            <div className={`fx-usage-sheet__bar-fill ${ctxClass(pct)}`} style={{ width: pct != null ? `${pct}%` : 0 }} />
           </div>
           <div className="fx-usage-sheet__tokens">
             {total != null && limit != null ? `${formatTokens(total)} of ${formatTokens(limit)} input tokens` : 'batas konteks tidak tersedia'}
