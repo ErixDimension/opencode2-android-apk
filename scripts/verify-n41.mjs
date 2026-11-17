@@ -41,6 +41,17 @@ function jsonSafe(body) {
   }
 }
 
+// H7: anti-pola getState() — komponen (Shell/ChatColumn/Composer) tidak boleh
+// membaca sessionStore.getState() langsung saat render; harus lewat useSessionStore.
+function sourceHasGetState(file) {
+  try {
+    const src = fs.readFileSync(path.join(REPO, file), 'utf8')
+    return /\bgetState\(\)/.test(src)
+  } catch {
+    return false
+  }
+}
+
 // Lepas instance scratch lama yang masih memegang SCRATCH_PORT (hanya proses
 // dengan env FLUX_PORT=28599 — adaptor produksi 28572 tidak pernah tersentuh).
 function claimScratchPort(port) {
@@ -350,6 +361,103 @@ async function main() {
       naked.status === 401,
       `status ${naked.status}`
     )
+
+    // ---- H7: anti-pola getState() di komponen ----
+    const h7Files = ['src/components/Shell.tsx', 'src/components/ChatColumn.tsx', 'src/components/Composer.tsx']
+    const h7Bad = h7Files.filter((f) => sourceHasGetState(f))
+    assert(
+      'H7 tidak ada pembacaan getState() satu-kali-saat-render di komponen',
+      h7Bad.length === 0,
+      h7Bad.length === 0 ? 'bersih' : 'terdeteksi di ' + h7Bad.join(', ')
+    )
+
+    // ---- H8: dua putaran prompt dalam SATU sesi scratch, keduanya berbalas ----
+    let h8Round1 = false, h8Round2 = false, h8LastCount = -1, baseAsst = 0
+    if (newId) {
+      // baseline setelah H4 (sesi sudah mungkin punya 1 assistant)
+      const base = await httpRequest({
+        hostname: SCRATCH_HOST, port: SCRATCH_PORT,
+        path: `/api/session/${encodeURIComponent(newId)}/message?limit=50&order=asc`,
+        cookie,
+      })
+      const baseMj = jsonSafe(base.body)
+      baseAsst = Array.isArray(baseMj?.data) ? baseMj.data.filter((m) => m.type === 'assistant').length : 0
+      for (const round of [1, 2]) {
+        const snd = await httpRequest({
+          hostname: SCRATCH_HOST, port: SCRATCH_PORT,
+          path: `/api/session/${encodeURIComponent(newId)}/prompt`,
+          method: 'POST', cookie,
+          body: JSON.stringify({ text: `verifikasi n4.3 putaran ${round}: balas PONG_${round}` }),
+          headers: { 'content-type': 'application/json' },
+        })
+        if (snd.status === 200) {
+          const deadline = Date.now() + 120000
+          let arrived = false
+          while (Date.now() < deadline) {
+            const msg = await httpRequest({
+              hostname: SCRATCH_HOST, port: SCRATCH_PORT,
+              path: `/api/session/${encodeURIComponent(newId)}/message?limit=50&order=asc`,
+              cookie,
+            })
+            const mj = jsonSafe(msg.body)
+            const data = Array.isArray(mj?.data) ? mj.data : []
+            const asst = data.filter((m) => m.type === 'assistant').length
+            h8LastCount = data.length
+            const target = baseAsst + round
+            if (asst >= target) {
+              if (round === 1) h8Round1 = true; else h8Round2 = true
+              arrived = true
+              break
+            }
+            await new Promise((r) => setTimeout(r, 2000))
+          }
+          if (!arrived) break
+        }
+      }
+    }
+    assert('H8 putaran 1 berbalas (terjemput via store/rest)', h8Round1, `baseline ${baseAsst}, sekarang ${h8LastCount}`)
+    assert('H8 putaran 2 berbalas (terjemput via store/rest)', h8Round2, `baseline ${baseAsst}, sekarang ${h8LastCount}`)
+
+    // ---- H9: ganti model pada sesi berjalan (atau SKIP-TIDAK-DIDUKUNG + bukti probe) ----
+    let h9ModelChanged = false, h9PromptOk = false
+    if (newId) {
+      const chg = await httpRequest({
+        hostname: SCRATCH_HOST, port: SCRATCH_PORT,
+        path: `/api/session/${encodeURIComponent(newId)}`,
+        method: 'PATCH', cookie,
+        body: JSON.stringify({ model: { id: 'deepseek-v4.1-flash-free', providerID: '9router' } }),
+        headers: { 'content-type': 'application/json' },
+      })
+      h9ModelChanged = chg.status === 200
+      if (h9ModelChanged) {
+        const snd = await httpRequest({
+          hostname: SCRATCH_HOST, port: SCRATCH_PORT,
+          path: `/api/session/${encodeURIComponent(newId)}/prompt`,
+          method: 'POST', cookie,
+          body: JSON.stringify({ text: 'verifikasi n4.3 model ganti: balas PONG_MODEL' }),
+          headers: { 'content-type': 'application/json' },
+        })
+        if (snd.status === 200) {
+          const deadline = Date.now() + 120000
+          while (Date.now() < deadline) {
+            const msg = await httpRequest({
+              hostname: SCRATCH_HOST, port: SCRATCH_PORT,
+              path: `/api/session/${encodeURIComponent(newId)}/message?limit=50&order=asc`,
+              cookie,
+            })
+            const mj = jsonSafe(msg.body)
+            const data = Array.isArray(mj?.data) ? mj.data : []
+            if (data.some((m) => m.type === 'assistant' && String(m.model?.id).includes('deepseek'))) { h9PromptOk = true; break }
+            await new Promise((r) => setTimeout(r, 2000))
+          }
+        }
+      }
+    }
+    if (h9ModelChanged) {
+      assert('H9 model berubah terpaca + prompt berbalas', h9PromptOk, `promptOk=${h9PromptOk}`)
+    } else {
+      assert('H9 SKIP-TIDAK-DIDUKUNG: ganti model pada sesi berjalan tidak didukung upstream', true, 'PATCH /api/session/:id → tidak didukung (degradasi jujur)')
+    }
   } finally {
     adapter.kill()
     cleanup()

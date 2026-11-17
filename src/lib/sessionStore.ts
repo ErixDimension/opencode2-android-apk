@@ -22,6 +22,7 @@ export interface StoreState {
   messages: Message[]
   cursor: { previous: string | null; next: string | null } | null
   loading: boolean
+  sessionsError: string | null
   modelContextLimit: number | null
   contextPercent: number | null
   modelLabel: string
@@ -37,6 +38,7 @@ const initialState: StoreState = {
   messages: [],
   cursor: null,
   loading: false,
+  sessionsError: null,
   modelContextLimit: null,
   contextPercent: null,
   modelLabel: '',
@@ -49,6 +51,8 @@ export class SessionStore {
   #debounce: ReturnType<typeof setTimeout> | null = null
   #refetchQueued = false
   #abort: AbortController | null = null
+  #pollTimer: ReturnType<typeof setTimeout> | null = null
+  #pollDeadline: number | null = null
 
   constructor() {
     this.#wireEvents()
@@ -114,10 +118,32 @@ export class SessionStore {
   async loadSessions(): Promise<void> {
     try {
       const sessions = await listSessions(50)
-      this.#set({ sessions: sessions.map((s) => ({ id: s.id, title: s.title, location: s.location, model: s.model, tokens: s.tokens, updatedAt: s.time?.updated })) })
-    } catch {
-      // biarkan sessions kosong, tampilkan kosong
+      this.#set({
+        sessions: sessions.map((s) => ({
+          id: s.id,
+          title: s.title,
+          location: s.location,
+          model: s.model,
+          tokens: s.tokens,
+          updatedAt: s.time?.updated,
+        })),
+        sessionsError: null,
+      })
+    } catch (err) {
+      // kegagalan harus terlihat, bukan diam sebagai "kosong"
+      this.#set({
+        sessionsError: err instanceof Error ? err.message : 'Gagal memuat daftar sesi.',
+      })
     }
+  }
+
+  /*────────────────────────────────────────────────────────────────────
+    Bootstrap berurutan: muat daftar, baru pilih sesi aktif pertama.
+    Dipakai saat masuk Shell dan setelah login sukses di Gate.
+    ────────────────────────────────────────────────────────────────────*/
+  async bootstrap(): Promise<void> {
+    await this.loadSessions()
+    await this.loadFirstActive()
   }
 
   async setActive(sessionID: string): Promise<void> {
@@ -125,6 +151,7 @@ export class SessionStore {
     if (!found) return
     this.#abort?.abort()
     this.#abort = new AbortController()
+    this.#stopPolling()
     this.#set({ active: found, blocks: [], messages: [], cursor: null, loading: true, activeRun: false })
     await this.#loadMessages(0)
     this.#set({ loading: false })
@@ -200,15 +227,59 @@ export class SessionStore {
     if (!active) return
     const { sendPrompt } = await import('./apiClient')
     await sendPrompt(active.id, text)
-    // optimistic: tunggu SSE lalu refetch via event wiring; paksa refresh singkat
+    // Jemput balasan: polling berkala sampai reply assistant tiba atau timeout 120 detik.
+    // SSE = akselerator (refetch via event wiring); REST = kebenaran.
     this.#requestRefetch('busy-idle')
+    this.#startPolling()
   }
 
   async interrupt(): Promise<void> {
     const active = this.#state.active
     if (!active) return
     await interruptSession(active.id)
+    this.#stopPolling()
     this.#requestRefetch('immediate')
+  }
+
+  /*────────────────────────────────────────────────────────────────────
+    Balasan terjemput — polling ±1,75s sampai reply assistant tiba
+    atau timeout 120 detik (§0.3 N4.3).
+    ─────────────────────────────────────────────────────────────────────*/
+  #startPolling(): void {
+    this.#stopPolling()
+    this.#pollDeadline = Date.now() + 120000
+    this.#tick()
+  }
+
+  #tick(): void {
+    if (this.#pollDeadline == null || Date.now() > this.#pollDeadline) {
+      this.#stopPolling()
+      return
+    }
+    const before = this.#state.messages.length
+    void this.#loadMessages(0).then(() => {
+      const last = this.#state.messages[this.#state.messages.length - 1]
+      const assistantArrived =
+        this.#state.messages.length > before &&
+        last &&
+        last.type === 'assistant'
+      const runSelesai = !this.#state.activeRun
+      if (assistantArrived || runSelesai) {
+        this.#stopPolling()
+        return
+      }
+      this.#pollTimer = setTimeout(() => this.#tick(), 1750)
+    }).catch(() => {
+      this.#pollTimer = setTimeout(() => this.#tick(), 1750)
+    })
+  }
+
+  #stopPolling(): void {
+    if (this.#pollTimer) {
+      clearTimeout(this.#pollTimer)
+      this.#pollTimer = null
+    }
+    this.#pollDeadline = null
   }
 
   async replyPermission(requestID: string, reply: 'accept' | 'reject' | 'always' | 'once', message = ''): Promise<void> {

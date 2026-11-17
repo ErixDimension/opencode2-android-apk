@@ -15,9 +15,9 @@
 
 Bagian ini memutuskan Pertanyaan Terbuka Bagian 6 yang bersifat desain. Penanda asal untuk nama/aturan dari bagian ini: `[KEPUTUSAN]`. Bila isi Bagian 0 bertentangan dengan bagian lain dokumen ini, **Bagian 0 yang berlaku**.
 
-1. **Daftar sesi (#1)** — Laci geser dari kiri di atas kolom chat, memakai token Bagian 1 (bukan bagian tulang; tulang hanya untuk percakapan). Class baru `[KEPUTUSAN]`: `.fx-drawer` (panel + overlay redup), `.fx-session-row` (satu sesi: judul, waktu relatif, `location.directory`, label model), `.fx-session-row[data-active="true"]` (garis kiri cyan + latar surface), `.fx-new-session` (tombol "Sesi Baru" di kepala laci). Laci dibuka dari satu tombol bulat melayang di pojok kiri atas kolom — `.fx-corner-btn` `[KEPUTUSAN]`, ikon Lucide `Layers` — yang juga membawa titik status koneksi SSE (hijau online / merah offline). Ini BUKAN header strip; kolom tetap penuh. Memilih sesi menutup laci dan mengganti seluruh isi `.fx-spine`.
+1. **Daftar sesi (#1)** — ⚠️ **TERGANTIKAN oleh Bagian 7 (Revisi Panel Sesi, DITERIMA Erix 2026-11-17 malam): bar sesi tipis + daftar kartu. Teks keputusan laci di bawah ini historis, jangan diimplementasikan.** Laci geser dari kiri di atas kolom chat, memakai token Bagian 1 (bukan bagian tulang; tulang hanya untuk percakapan). Class baru `[KEPUTUSAN]`: `.fx-drawer` (panel + overlay redup), `.fx-session-row` (satu sesi: judul, waktu relatif, `location.directory`, label model), `.fx-session-row[data-active="true"]` (garis kiri cyan + latar surface), `.fx-new-session` (tombol "Sesi Baru" di kepala laci). Laci dibuka dari satu tombol bulat melayang di pojok kiri atas kolom — `.fx-corner-btn` `[KEPUTUSAN]`, ikon Lucide `Layers` — yang juga membawa titik status koneksi SSE (hijau online / merah offline). Ini BUKAN header strip; kolom tetap penuh. Memilih sesi menutup laci dan mengganti seluruh isi `.fx-spine`.
 2. **Pemetaan event (#2)** — Pekerjaan discovery N4 (lihat prompt N4): sensus tipe envelope nyata + pemetaan ke kind dibangun dari bukti. Prinsip penahan risiko: render blok TIDAK bergantung pada menebak semua tipe event — event hanya pemicu refetch REST ter-debounce (300/400ms) dan penanda liveness; satu-satunya tipe yang wajib pasti namanya dari bukti adalah pemicu permission dan penanda busy/idle sesi.
-3. **Permission (#3)** — Kind baru `permission` `[KEPUTUSAN]`. Anatomi: node amber berdenyut (`.is-live`) selama menunggu; kartu `.fx-permission`: header mono amber `IZIN DIMINTA`, nama tool + ringkasan input (mono, bisa diperluas), dua tombol di `.fx-permission-actions`: `IZINKAN` (garis hijau) / `TOLAK` (garis merah) yang memanggil endpoint reply permission upstream. Sesudah dijawab, kartu menyusut menjadi satu baris hasil (`✓ Diizinkan — <tool>` hijau / `✗ Ditolak — <tool>` merah) dan node berhenti berdenyut. Keadaan kedaluwarsa/tidak dikenal ditampilkan apa adanya dari data — jangan dikarang.
+3. **Permission (#3)** — ⚠️ **DIPERLUAS oleh Bagian 8 (popup auto + tiga tombol termasuk Always allow, DITERIMA Erix 2026-11-17 23:58 WIB)** — anatomi kartu di bawah ini tetap berlaku sebagai catatan permanen di tulang; lapisan permukaan dan pilihan ketiganya diatur Bagian 8. Kind baru `permission` `[KEPUTUSAN]`. Anatomi: node amber berdenyut (`.is-live`) selama menunggu; kartu `.fx-permission`: header mono amber `IZIN DIMINTA`, nama tool + ringkasan input (mono, bisa diperluas), dua tombol di `.fx-permission-actions`: `IZINKAN` (garis hijau) / `TOLAK` (garis merah) yang memanggil endpoint reply permission upstream. Sesudah dijawab, kartu menyusut menjadi satu baris hasil (`✓ Diizinkan — <tool>` hijau / `✗ Ditolak — <tool>` merah) dan node berhenti berdenyut. Keadaan kedaluwarsa/tidak dikenal ditampilkan apa adanya dari data — jangan dikarang.
 4. **Lubang kind (#4)** — (a) Node `diff`: **hijau**. Node `summary`: **cincin segel hijau** — SVG cincin + centang menggantikan lingkaran `::before` (prinsip "Selesai = segel cincin penuh" berlaku harfiah). (b) `research`: tidak ada anatomi sendiri di N4 — dirender sebagai slab gaya `log` (node violet, judul dari data). (c) Segel verifikasi BUKAN kind sendiri: cincin-cincin check tinggal di seksi VERIFIKASI blok `summary`, satu `.fx-seal` `[KEPUTUSAN]` per check; mengklik cincin yang gagal men-scroll ke blok error terkait.
 5. **Simpul mata Explored (#5)** — Simpul mata MENANG (prinsip bentuk = makna + video patokan). Node `::before` untuk `[data-kind="code"]` dinonaktifkan; simpul mata adalah SVG inline `.fx-eye-knot` `[KEPUTUSAN]` yang diposisikan persis di `--fx-spine-x` pada tinggi header blok (pola yang sama dengan simpul Thought): elips hijau + titik tengah, berdenyut halus saat `live`.
 6. **Konflik antar blueprint (#6)** — Blueprint Chat menang di wilayah chat: (a) ruas abu = `.fx-attempt-collapsed` (opacity .55, saturate(.3), mono 11,5px); nama `.fx-attempt` TIDAK dipakai. (b) `.fx-edit-old { color:#f8a5a5; text-decoration: line-through; text-decoration-color: var(--fx-red) }`; `.fx-edit-new { background: rgba(74,222,128,.16); color:#aef5c3 }`.
@@ -510,4 +510,86 @@ Hal-hal yang **tidak** diselesaikan sumber mana pun. Status finalisasi: #1, #3, 
 
 ---
 
-*Akhir draft. Langkah berikutnya di luar dokumen ini: Muse meninjau draft, memutuskan Pertanyaan Terbuka yang bersifat desain, lalu menyusun prompt eksekusi N4 (termasuk discovery untuk #2, #10, #13) dari spec yang sudah final.*
+---
+
+## 7. Revisi Panel Sesi — DITERIMA Erix (2026-11-17 malam) [MENGIKAT]
+
+Referensi visual mengikat untuk wilayah panel sesi: **`panel-sesi-flow.mp4`** (36,5 dtk) + `session-list-cards.png` + `thin-panel-chat.png` + `new-session-dialog.png`. Bila Bagian 7 bertentangan dengan Bagian 0 #1, Bagian 2.8, atau Bagian 4.2 soal daftar sesi, **Bagian 7 yang berlaku**. Class `.fx-corner-btn` dan `.fx-drawer` PENSIUN untuk keperluan daftar sesi. Penanda asal bagian ini: `[KEPUTUSAN]`.
+
+### 7.1 Bar sesi — `.fx-sessionbar`
+Satu baris, full-width mentok kanan-kiri, menempel di atas kolom chat, **ditipiskan maksimal** (target tinggi ±36–40px; seluruh bar adalah satu target sentuh — tidak ada tombol terpisah di dalamnya selain chevron visual). Isi kiri→kanan: titik status (hijau bernafas = terhubung), nama sesi aktif (sans bold), label model sesi (mono, redup), lencana proses `.fx-process-badge` (amber: jumlah sesi LAIN yang sedang berproses + titik berdenyut; tidak dirender bila nol), chevron buka/tutup di ujung kanan. Bar ini satu-satunya pintu daftar sesi; pola hamburger/laci dilarang.
+
+### 7.2 Daftar sesi — `.fx-session-list`
+Kolom yang meluncur turun dari bar (transisi geser ±300ms) dan menempati wilayah di bawah bar selama terbuka; daftar bergulir di dalam kolomnya sendiri. Isi: kepala `DAFTAR SESI` + hitungan sesi (dari data nyata), kartu-kartu sesi, dan kartu tambah sesi (di ekor daftar atau menempel di bawah daftar — satu pilihan, konsisten).
+
+### 7.3 Kartu sesi — `.fx-session-card`
+Satu sesi per kartu; simpul tulang mini hidup di sisi kiri kartu. Isi kartu: simpul status, judul sesi, chip status, baris model, baris meta (waktu relatif · token · jumlah pesan — hanya dari data nyata), dan dua tombol aksi yang selalu tampak: pensil (rename / ganti model) dan tong sampah (delete). Keadaan `[data-state]`: `active` (bingkai + chip cyan `AKTIF` — sesi yang sedang dibuka), `run` (bingkai + chip amber `PROSES`), `idle` (redup, tanpa chip).
+
+### 7.4 Animasi keadaan `run` (bahasa animasi resmi — sederhana, CSS murni)
+(a) Spinner busur menggantikan simpul kartu: rotate 0,9s linear infinite, amber. (b) Teks `Sedang bekerja` + tiga titik berdenyut (pulse 1,2s, jeda bertingkat 0 / 0,15 / 0,3s). (c) Bar tipis di kaki kartu: kilau menyapu (sweep 2s) di atas rel; isi bar proporsional HANYA bila ada data nyata (mis. hitungan langkah dari event) — selain itu indeterminate. Teks meta `berjalan … · langkah …` hanya dari sumber nyata; tanpa sumber, tampilkan durasi saja atau kosong. **Dilarang mengarang persen/langkah.** Lencana proses di bar memakai denyut yang sama.
+
+### 7.5 Alur rename
+Pensil di kartu → kartu mengembang: kolom nama (nilai awal = nama sekarang) + tombol `SIMPAN`. Simpan memanggil mekanisme ganti judul upstream — **wajib dibuktikan pada discovery N4.4** (endpoint update sesi). Bila upstream tidak menyediakan cara mengganti judul, degrade dengan jujur dan laporkan; jangan berpura-pura tersimpan. Sukses: kartu berkedip hijau sesaat.
+
+### 7.6 Alur delete
+Tong sampah → kartu mengembang: konfirmasi sebaris `Hapus sesi ini?` + `Batal` / `HAPUS` (merah). `HAPUS` memanggil endpoint delete upstream (dibuktikan di discovery); kartu runtuh (collapse) dan hitungan sesi berkurang. Menghapus sesi yang sedang berproses: hentikan dulu (interrupt) baru hapus, atau tolak dengan pesan jelas — mengikuti perilaku upstream yang terbukti; tidak boleh diam-diam gagal.
+
+### 7.7 Alur ganti model dari kartu
+Baris model pada kartu membuka daftar model; kontraknya sama dengan pemilih model composer (N4.3 Tahap 3: daftar model + cara memasang dibuktikan dari upstream). Pilihan yang terpasang menimpa label model kartu. Degradasi jujur sama seperti pemilih composer.
+
+### 7.8 Alur sesi baru
+Kartu `+ Sesi baru` → dialog (lembar dari bawah): chip `SERVER` (hari ini hanya lokal Termux; pilihan lain menyusul jalur multi-server), chip `PROJECT`, baris `WORKING DIRECTORY` (location sesi), lalu berurutan: ① `NAMA SESI` (kolom teks) → ② `PILIH MODEL` (radio; hint pemakaian model diperbolehkan) → ③ `RUN IN`: `Local` (default) / `New worktree` — worktree HANYA opsi aktif bila upstream terbukti mendukung isolasi worktree pada discovery; bila tidak, opsi disembunyikan atau nonaktif berlabel belum didukung → tombol `START CHAT` membuat sesi (judul + model + direktori sesuai kontrak terbukti), dialog menutup, kartu sesi baru muncul di puncak daftar, dan pengguna masuk ke chat sesi itu.
+
+### 7.9 Soliditas layout
+Shell mengunci lebar device: tidak ada overflow horizontal dalam keadaan apa pun (bar, daftar, dialog, kolom chat). Yang bergulir hanya kolom chat (vertikal) dan daftar sesi (vertikal, internal). Aturan ini menambah Bagian 0 #16 untuk wilayah panel sesi.
+
+### 7.10 Session Usage [KEPUTUSAN — DITERIMA Erix 2026-11-17 23:44]
+Fungsinya meniru panel "Session usage" pada contoh Erix (screenshot 23:44 WIB), tetapi kulit dan bahasa desainnya SPINE//FLUX. **Penempatan (prinsip anti-menumpuk): tidak ada panel permanen baru.** Tiga titik hidupnya:
+1. **Titik masuk utama** — strip status tipis **di bawah composer** (`.fx-underbar`): hairline konteks selebar strip + label mono `konteks N% · X of Y`; ketuk stripnya → lembar statistik sesi aktif (`.fx-usage-sheet`) meluncur dari bawah menimpa kolom chat yang diredupkan; tutup via `Close`/✕, ketuk di luar, atau geser turun. **Interior composer DIPESAN untuk fitur plan/build mendatang (keputusan Erix 2026-11-17 23:51 WIB) — label konteks TIDAK di dalam composer, dan jangan menaruh kontrol lain di dalamnya.** (Penempatan ini memurnikan Bagian 0 #15: sumber datanya sama, tempat tinggal labelnya di `.fx-underbar`.)
+2. **Bar konteks mini di kartu sesi** — garis rambut (hairline) di kaki tiap kartu `.fx-session-card` + label `konteks N%` di baris meta: murni tampilan, untuk memantau sesi latar tanpa membukanya. Warna: cyan normal, amber ≥80%, merah ≥95%.
+3. **Baris `Statistik sesi`** di menu kartu (pensil) — membuka lembar usage sesi itu tanpa berpindah sesi.
+
+Isi lembar (atas→bawah): kepala simpul + `SESSION USAGE` + nama sesi + `Close`; baris biaya `Estimated API cost` — angka dolar hanya bila sumber harga terbukti, selain itu tampilkan status `Pricing unavailable` (kenyataan lingkungan ini: model `:free` via 9Router; jangan menampilkan angka karangan); blok `Context utilization`: persen besar + bar + format `X of Y input tokens` (tokens sesi ÷ limit model, sumber Bagian 0 #15; angka diringkas K/M); catatan kejujuran `Rincian mencakup riwayat yang termuat.` bila ada bagian yang diturunkan dari pesan terpaginasi; kartu rincian per model: provider, nama model, dan baris statistik mono `in · out · reasoning · cache read · cache write · steps`. Pada utilisasi ≥80% lembar menampilkan saran pasif: pertimbangkan sesi baru + minta ringkasan (bukan pop-up).
+
+Sumber data: total token dari field `tokens` record sesi (kumulatif — terbukti di discovery N4). Rincian PER MODEL dan `steps` adalah **item discovery N4.4**: bila pesan assistant membawa token/model per pesan, rincian dihitung dari sana (dengan catatan riwayat termuat); bila tidak, rincian tampil agregat satu blok berlabel model sesi saat ini — dilarang memecahnya secara karangan.
+
+### 7.11 Penempatan phase
+Dikerjakan di **N4.4** (setelah N4.3 menutup inti chat), menggantikan komponen `SessionDrawer`; Shell menata ulang: `.fx-sessionbar` di atas `.fx-col`. Gerbang mengikuti pola tetap: harness diperluas + commit/push + TEST A oleh Erix.
+
+---
+
+---
+
+## 8. Revisi Interaksi Agent — Popup Permission & Fitur Question (DITERIMA Erix 2026-11-17 23:58 WIB) [MENGIKAT]
+
+### 8.1 Permission: popup auto + tiga tombol (kartu Bagian 0 #3 tetap)
+- **Auto popup** — saat permintaan izin tiba untuk sesi AKTIF: lembar `.fx-permission-sheet` meluncur dari bawah menimpa chat yang diredupkan (keluarga gerak yang sama dengan `.fx-usage-sheet`). Isi: simpul amber berdenyut + header mono `IZIN DIMINTA` + nama sesi; nama tool + ringkasan input (slab mono, bisa diperluas); baris cakupan Always (lihat bawah); tiga tombol: `ALLOW ONCE` (garis hijau), `ALWAYS ALLOW` (garis amber + subteks cakupan), `REJECT` (garis merah). Popup TIDAK hilang sendiri, TIDAK menjawab sendiri, dan menahan composer sampai dijawab atau kedaluwarsa.
+- **Sesi latar** — permintaan untuk sesi yang tidak sedang dibuka TIDAK memaksa popup: kartu sesi itu mendapat lencana peringatan `.fx-card-alert` (amber, berdenyut) dan hitungannya ikut tampil di area lencana bar; mengetuknya membuka daftar → sesi → popup-nya. Antrean global: satu popup pada satu waktu, urutan kedatangan, indikator `1 dari N`.
+- **ALWAYS ALLOW** — sebelum ditekan, popup menampilkan cakupan persisnya (tool + pola perintah/path sebagaimana disediakan upstream). Mekanismenya **item discovery N4.4**: (a) bila endpoint reply upstream menerima nilai `always`, pakai itu; (b) bila tidak, fallback daftar izin tersimpan sisi klien per sesi (pola cocok → balas `once` otomatis) yang WAJIB terlihat dan bisa dicabut dari menu kartu sesi (baris `Izin tersimpan`). Dilarang menampilkan Always seolah persisten bila sebenarnya tidak.
+- Hasil jawaban masuk ke kartu tulang sesuai Bagian 0 #3, dengan teks hasil yang membedakan pilihan: `✓ Diizinkan sekali` / `✓ Selalu diizinkan` / `✗ Ditolak` — `<tool>`. Keadaan kedaluwarsa ditampilkan apa adanya: popup berubah menjadi pemberitahuan kedaluwarsa dan tombol-tombolnya mati.
+
+### 8.2 Fitur Question — `.fx-question`
+Agent dapat bertanya dan berhenti menunggu jawaban user (mekanisme question upstream).
+- **Permukaan ganda seperti permission**: kartu `.fx-question` di tulang (pertanyaan + jawaban terpilih, sebagai catatan permanen) + lembar `.fx-question-sheet` yang muncul otomatis untuk sesi aktif; sesi latar memakai lencana `.fx-card-alert` yang sama dengan 8.1.
+- **Isi lembar**: header mono violet `PERTANYAAN DARI AGENT` + nama sesi; teks pertanyaan; pilihan jawaban sebagai baris penuh yang bisa diketuk (label + deskripsi bila upstream menyediakannya); kolom jawaban bebas bila upstream mengizinkan jawaban kustom; beberapa pertanyaan sekaligus dirender bertahap dengan indikator `Pertanyaan i dari n`.
+- **Status menunggu**: selama question belum dijawab, sesi berstatus MENUNGGU — kartu sesinya menampilkan chip `MENUNGGU JAWABAN` (violet), menggantikan `PROSES` (agent tidak sedang bekerja; dia terblokir oleh user).
+- **Discovery wajib (N4.4)**: nama event question, bentuk payload (jumlah pertanyaan, bentuk opsi, dukungan multi-pilih dan jawaban kustom), endpoint + body reply, dan semantik menolak/menutup tanpa menjawab. Bila upstream ternyata TIDAK punya mekanisme question, fitur ini gugur dengan bukti tertulis di laporan — jangan dibuat-buat.
+
+### 8.3 Aturan bersama lapisan popup
+Satu lembar pada satu waktu untuk semua jenis yang menunggu jawaban (permission, question); lembar usage tidak ikut antre karena hanya dibuka manual. Popup tidak pernah menumpuk; Gate login selalu di atas segalanya; tidak ada jawaban otomatis dalam keadaan apa pun. Versi web memakai popup di dalam aplikasi; notifikasi level OS dicatat sebagai pertimbangan phase APK (N9), bukan sekarang.
+
+### 8.4 Penempatan phase & gerbang
+Masuk scope **N4.4** (bersama panel sesi Bagian 7 + Session Usage 7.10). Discovery kontrak permission/question adalah langkah pertama di dalam phase itu. Harness diperluas bila skenarionya bisa dipicu di sesi scratch (panggilan tool yang memicu izin; question bila bisa dipicu); yang tidak bisa dipicu otomatis dicatat NOT TESTED dan menjadi skenario TEST A manual Erix. Klaim PASS penuh untuk permission dilarang tanpa bukti live minimal satu kali.
+
+### 8.5 Lampiran — Peta permission dari project lama (bahan discovery, BUKAN kontrak terbukti)
+Disampaikan Erix 2026-11-18 00:07 WIB, hasil pemetaan project lama (28571) terhadap upstream yang sama. Status: pengetahuan protokol — **WAJIB diverifikasi ulang satu per satu ke upstream live pada discovery N4.4** sebelum dipakai. Kode lama tidak disalin; nama file lama (`PermissionPopup.tsx`, `permissionPolicy.ts`, `opencodeClient.ts`) hanya penunjuk lokasi konsep.
+- `GET /api/permission/request` — daftar permission request yang menunggu (global).
+- `GET /api/session/{sessionID}/permission` — permission aktif dalam satu sesi.
+- `POST /api/session/{sessionID}/permission/{permissionID}/reply` — kirim jawaban. Payload yang pernah diuji: `{"reply":"once"}` dan `{"reply":"always"}`. Payload reject BELUM pernah dikutip dari pengujian — wajib verifikasi (kandidat `{"reply":"reject"}`).
+- `GET /api/permission/saved` — aturan permission tersimpan: bukti bahwa mekanisme Always adalah aturan persisten di upstream, bukan sekadar sisi klien. Ini hipotesis utama untuk 8.1(a); fallback klien 8.1(b) hanya bila verifikasi membantahnya.
+- ⚠️ **Temuan wildcard**: pernah ada aturan tersimpan berpola wildcard yang membuat Reject terasa tidak berfungsi (permintaan ter-izin otomatis oleh aturan sebelum user sempat menolak). Konsekuensi desain: (1) daftar `Izin tersimpan` di menu kartu sesi adalah WAJIB dan harus mampu menghapus aturan, termasuk yang berpola wildcard; (2) permintaan yang lolos otomatis oleh aturan tersimpan tetap meninggalkan kartu hasil di tulang bertuliskan `Diizinkan otomatis — aturan tersimpan`, lengkap dengan jalan mencabut aturannya; (3) discovery wajib menguji perilaku ini secara eksplisit.
+- Question: project lama TIDAK pernah mengimplementasikannya dan tidak ada endpoint Question yang diketahui. Discovery 8.2 mulai dari nol; pola sejajar (mis. kandidat `GET /api/question/...`) boleh diuji read-only — tetap dilarang mengarang endpoint.
+
+---
+
+*Akhir draft. Langkah berikutnya di luar dokumen ini: Muse meninjau draft, memutuskan Pertanyaan Terbuka yang bersifat desain, lalu menyusun prompt eksekusi N4 (termasuk discovery untuk #2, #10, #13) dari spec yang sudah final. — Ditambah Bagian 7 pada revisi 2026-11-17 malam (panel sesi diterima Erix dari video panel-sesi-flow.mp4); Bagian 7.10 pada 23:44–23:51 (Session Usage diterima + koreksi penempatan .fx-underbar); Bagian 8 pada 23:58 (popup permission + fitur question diterima Erix).*

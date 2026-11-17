@@ -40,8 +40,11 @@ export default function App() {
 
   useEffect(() => {
     if (view === 'app') {
-      void sessionStore.loadSessions()
-      void sessionStore.loadFirstActive()
+      void (async () => {
+        // loadSessions dulu, baru loadFirstActive — sesi pertama dipilih
+        // hanya setelah daftar benar-benar tiba dari adaptor.
+        await sessionStore.bootstrap()
+      })()
     }
   }, [view])
 

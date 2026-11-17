@@ -67,7 +67,7 @@ export function Gate({ onApp }: Props) {
     setBusy(true)
     try {
       const res = await loginPassword(password)
-      if (res.ok) { onApp(); sessionStore.loadSessions() }
+      if (res.ok) { onApp(); void sessionStore.bootstrap() }
       else if (res.status === 401) setError('Password salah.')
       else if (res.status === 429) setError('Terlalu banyak percobaan. Kunci 60 detik.')
       else if (res.error === 'SETUP_REQUIRED') { setView('setup') }

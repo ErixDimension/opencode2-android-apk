@@ -5,27 +5,37 @@ import * as React from 'react'
 import { useState, type FormEvent } from 'react'
 import { ArrowUp, StopCircle, Monitor, RotateCcw } from 'lucide-react'
 import { sessionStore } from '../lib/sessionStore'
+import { useSessionStore } from '../lib/useSessionStore'
 
 export function Composer() {
   const [text, setText] = useState('')
   const [editing, setEditing] = useState(false)
   const [editBase, setEditBase] = useState('')
+  const [sendError, setSendError] = useState<string | null>(null)
+
+  const state = useSessionStore()
 
   const stop = () => { sessionStore.interrupt() }
 
-  const onSubmit = (event: FormEvent) => {
+  const onSubmit = async (event: FormEvent) => {
     event.preventDefault()
+    setSendError(null)
     const t = text.trim()
     if (!t) return
-    if (editing) {
-      sessionStore.sendPrompt(t)
-      sessionStore.revertCommit()
-      setEditing(false)
-      setEditBase('')
-      setText('')
-    } else {
-      sessionStore.sendPrompt(t)
-      setText('')
+    try {
+      if (editing) {
+        await sessionStore.sendPrompt(t)
+        sessionStore.revertCommit()
+        setEditing(false)
+        setEditBase('')
+        setText('')
+      } else {
+        await sessionStore.sendPrompt(t)
+        setText('')
+      }
+    } catch (err) {
+      // Error kirim TIDAK diam: tampilkan sebagai chip/blok error di kolom chat.
+      setSendError(err instanceof Error ? err.message : 'Gagal mengirim prompt.')
     }
   }
 
@@ -33,12 +43,12 @@ export function Composer() {
 
   const cancelEdit = () => { setText(editBase); setEditing(false) }
 
-  const state = sessionStore.getState()
   const live = state.activeRun
   const placeholder = live ? 'Agent bekerja…' : editing ? 'Mengedit percobaan…' : 'Tulis pesan…'
 
   return (
-    <div className="fx-composer" data-ctx-high={state.contextPercent != null && state.contextPercent > 90 ? 'true' : 'false'} style={{ '--ctx': `${state.contextPercent ?? 0}%` } as React.CSSProperties}>
+    <>
+      <div className="fx-composer" data-ctx-high={state.contextPercent != null && state.contextPercent > 90 ? 'true' : 'false'} style={{ '--ctx': `${state.contextPercent ?? 0}%` } as React.CSSProperties}>
       <div className="flex items-start justify-between gap-2 mb-1 text-xs text-slate-500 font-mono">
         <span className="flex items-center gap-1"><Monitor size={12} /> {state.modelLabel}</span>
         <span>{state.contextPercent != null ? `konteks ${state.contextPercent}%` : 'konteks —'}</span>
@@ -72,5 +82,11 @@ export function Composer() {
         </div>
       )}
     </div>
+    {sendError && (
+      <div className="mt-2 font-mono text-xs text-rose-400 bg-rose-900/30 border border-rose-500/30 rounded-lg p-2 whitespace-pre-wrap break-words">
+        ✗ {sendError}
+      </div>
+    )}
+    </>
   )
 }

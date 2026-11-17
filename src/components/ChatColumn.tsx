@@ -6,33 +6,30 @@ import { useEffect, useRef } from 'react'
 import { RenderBlock } from './blocks'
 import { Composer } from './Composer'
 import { sessionStore } from '../lib/sessionStore'
+import { useSessionStore } from '../lib/useSessionStore'
 import { replyPermission } from '../lib/apiClient'
 
 export function ChatColumn() {
   const scrollRef = useRef<HTMLDivElement>(null)
+  const state = useSessionStore()
+  const active = state.active
 
   const onPermissionReply = (reply: 'accept' | 'reject') => {
-    const state = sessionStore.getState()
     const pending = state.blocks.find((b) => b.kind === 'permission' && (b.payload as { status?: string }).status === 'pending')
     if (!pending) return
     const requestID = (pending.payload as { requestID?: string }).requestID
-    if (requestID && state.active) replyPermission(state.active.id, requestID, reply)
+    if (requestID && active) replyPermission(active.id, requestID, reply)
   }
 
   useEffect(() => {
-    const unsub = sessionStore.subscribe(() => {
-      if (sessionStore.getState().activeRun && scrollRef.current) {
-        const el = scrollRef.current
-        if (el.scrollHeight - el.scrollTop - el.clientHeight < 80) el.scrollTop = el.scrollHeight
-      }
-    })
-    return () => unsub()
-  }, [])
+    // Auto-scroll ke bawah saat run aktif dan user sudah dekat bawah.
+    if (state.activeRun && scrollRef.current) {
+      const el = scrollRef.current
+      if (el.scrollHeight - el.scrollTop - el.clientHeight < 80) el.scrollTop = el.scrollHeight
+    }
+  }, [state])
 
   const loadOlder = () => { sessionStore.loadOlder() }
-
-  const state = sessionStore.getState()
-  const active = state.active
 
   if (!active) {
     return (

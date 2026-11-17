@@ -101,11 +101,10 @@ export class EventStream {
       if (this.#stopped) return
 
       if (response.status === 401) {
-        // 401 = sesi tidak valid: berhenti mencoba.
-        this.#stopped = true
-        this.#running = false
+        // 401 = sesi tidak valid: jangan mati permanen (latch). Backoff + reconnect
+        // agar stream pulih sendiri bila kredensial di-refresh (mis. rotasi password).
         this.#clearWatchdog()
-        this.#setState('unauthorized')
+        this.#scheduleReconnect()
         return
       }
 

@@ -8,11 +8,13 @@ import { type SessionView } from '../lib/sessionStore'
 interface Props {
   sessions: SessionView[]
   active: SessionView | null
+  sessionsError: string | null
   onSelect: (sessionID: string) => void
   onNew: () => void
+  onRetry?: () => void
 }
 
-export function SessionDrawer({ sessions, active, onSelect, onNew }: Props) {
+export function SessionDrawer({ sessions, active, sessionsError, onSelect, onNew, onRetry }: Props) {
   const [open, setOpen] = useState(false)
   const [online, setOnline] = useState(eventStream.getState() === 'online')
 
@@ -51,7 +53,21 @@ export function SessionDrawer({ sessions, active, onSelect, onNew }: Props) {
                   </div>
                 </button>
               ))}
-              {sessions.length === 0 && <div className="px-16 py-4 text-xs text-slate-500 font-mono">Belum ada sesi.</div>}
+              {sessionsError ? (
+                <div className="px-16 py-4 text-xs text-rose-400 font-mono space-y-2">
+                  <div>{sessionsError}</div>
+                  {onRetry && (
+                    <button
+                      className="text-emerald-400 hover:underline"
+                      onClick={onRetry}
+                    >
+                      Muat ulang daftar sesi
+                    </button>
+                  )}
+                </div>
+              ) : sessions.length === 0 && (
+                <div className="px-16 py-4 text-xs text-slate-500 font-mono">Belum ada sesi.</div>
+              )}
             </div>
             <button className="fx-new-session" onClick={() => { onNew(); setOpen(false) }}>
               <Plus size={16} /> Sesi Baru
