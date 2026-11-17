@@ -122,11 +122,48 @@ export async function getMessages(sessionID: string, limit: number, order: 'asc'
   return json.data as MessagesPage;
 }
 
-export async function createSession(): Promise<Session> {
-  const res = await request('/api/session', { method: 'POST', body: JSON.stringify({}), headers: { 'content-type': 'application/json' } });
+export async function createSession(init?: { title?: string; model?: { id: string; providerID: string; variant?: string }; directory?: string }): Promise<Session> {
+  const res = await request('/api/session', {
+    method: 'POST',
+    body: JSON.stringify(init ?? {}),
+    headers: { 'content-type': 'application/json' },
+  });
   const json = await readJson(res);
   if (!json.ok) throw new Error(`createSession ${json.status}`);
   return (json.data as { data: Session }).data;
+}
+
+export async function deleteSession(id: string): Promise<{ ok: boolean; status: number }> {
+  const res = await request(`/api/session/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  return { ok: res.ok, status: res.status };
+}
+
+/* §7.5/§7.7 — PATCH/PUT/POST /api/session/:id semua 404 upstream (dibuktikan
+   discovery N4.4). Fungsi tetap ada untuk alur degradasi jujur: panggilan
+   gagal dan error ditampilkan, tidak berpura-pura tersimpan/diganti. */
+export async function updateSession(id: string, patch: { title?: string; model?: { id: string; providerID: string } }): Promise<{ ok: boolean; status: number }> {
+  const res = await request(`/api/session/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+    headers: { 'content-type': 'application/json' },
+  });
+  return { ok: res.ok, status: res.status };
+}
+
+export interface PermissionRule { id: string; action: string; resource: string; effect?: string; }
+
+export async function getPermissionSaved(): Promise<PermissionRule[]> {
+  const res = await request('/api/permission/saved');
+  const json = await readJson(res);
+  if (!json.ok) throw new Error(`getPermissionSaved ${json.status}`);
+  return (json.data as { data: PermissionRule[] }).data ?? [];
+}
+
+export async function getModelList(): Promise<ModelDefault['data'][]> {
+  const res = await request('/api/model');
+  const json = await readJson(res);
+  if (!json.ok) throw new Error(`getModelList ${json.status}`);
+  return (json.data as { data: ModelDefault['data'][] }).data ?? [];
 }
 
 export async function sendPrompt(sessionID: string, text: string): Promise<{ ok: boolean }> {

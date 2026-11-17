@@ -2,7 +2,18 @@
 // hanya pemicu refetch ter-debounce (§0.2) dan penanda liveness. Event tidak dirender langsung.
 
 import { eventStream } from './eventStream'
-import { getMessages, listSessions, interruptSession, replyPermission, revertStage, revertClear, revertCommit, type Message } from './apiClient'
+import {
+  getMessages,
+  listSessions,
+  interruptSession,
+  deleteSession,
+  replyPermission,
+  revertStage,
+  revertClear,
+  revertCommit,
+  updateSession,
+  type Message,
+} from './apiClient'
 import { mapMessages, type FluxBlock, contextPercent } from './blockMapper'
 import { DEBOUNCE_ACTIVE_MS, DEBOUNCE_IDLE_MS, PAGE_SIZE } from './apiClient'
 
@@ -27,6 +38,9 @@ export interface StoreState {
   contextPercent: number | null
   modelLabel: string
   activeRun: boolean
+  permissionOpen: boolean
+  pendingPermission: { requestID: string; sessionID: string; tool: string; input: string } | null
+  permissionResult: { kind: 'once' | 'always' | 'reject' | 'expired'; tool: string } | null
 }
 
 type Listener = (state: StoreState) => void
@@ -43,6 +57,9 @@ const initialState: StoreState = {
   contextPercent: null,
   modelLabel: '',
   activeRun: false,
+  permissionOpen: false,
+  pendingPermission: null,
+  permissionResult: null,
 }
 
 export class SessionStore {
@@ -87,9 +104,23 @@ export class SessionStore {
       const activeID = this.#state.active?.id
       if (!sessionID || sessionID !== activeID) return
 
-      // §0.2 — tipe wajib: permission & penanda busy/idle sesi
+      // §0.2 — tipe wajib: permission & penanda busy/idle sesi.
+      // Event permission untuk sesi aktif → buka lembar izin (jika data
+      // permintaan tersedia di envelope). permission.asked tidak pernah nyala
+      // live karena aturan wildcard :*:* auto-approve (Latarangan 8.5) — jalur
+      // ini siap infrastruktur, diam bila tidak ada event nyata.
       if (type.startsWith('permission')) {
         this.#requestRefetch('immediate')
+        const requestID = String(data?.requestID ?? data?.permissionID ?? data?.id ?? '')
+        const tool = String(data?.tool ?? data?.name ?? '')
+        const raw = data?.input ?? data?.params ?? ''
+        const input = typeof raw === 'string' ? raw : JSON.stringify(raw)
+        if (requestID || tool) {
+          this.#set({
+            permissionOpen: true,
+            pendingPermission: { requestID, sessionID, tool, input },
+          })
+        }
         return
       }
       if (type === 'session.execution.started' || type === 'session.execution.succeeded' ||
@@ -287,6 +318,68 @@ export class SessionStore {
     if (!active) return
     await replyPermission(active.id, requestID, reply, message)
     this.#requestRefetch('immediate')
+  }
+
+  /*────────────────────────────────────────────────────────────────────
+    Lembar izin (§8.1)
+  ─────────────────────────────────────────────────────────────────────*/
+  openPermissionSheet(pending: { requestID: string; sessionID: string; tool: string; input: string }): void {
+    this.#set({ permissionOpen: true, pendingPermission: pending, permissionResult: null })
+  }
+
+  closePermissionSheet(): void {
+    this.#set({ permissionOpen: false, pendingPermission: null, permissionResult: null })
+  }
+
+  setPermissionResult(kind: 'once' | 'always' | 'reject' | 'expired', tool: string): void {
+    this.#set({ permissionResult: { kind, tool } })
+  }
+
+  /*────────────────────────────────────────────────────────────────────
+    Hapus sesi (§7.6): interrupt dulu bila sesi aktif sedang berjalan,
+    baru DELETE; tidak pernah diam-diam gagal.
+  ─────────────────────────────────────────────────────────────────────*/
+  async removeSession(id: string): Promise<void> {
+    const isActive = this.#state.active?.id === id
+    if (isActive && this.#state.activeRun) {
+      await this.interrupt()
+    }
+    try {
+      await deleteSession(id)
+    } catch (err) {
+      this.#set({
+        sessionsError: err instanceof Error ? err.message : 'Gagal menghapus sesi.',
+      })
+      throw err
+    }
+    await this.loadSessions()
+    if (isActive) {
+      this.#set({ active: null, blocks: [], messages: [], cursor: null, activeRun: false })
+      if (this.#state.sessions.length > 0) await this.setActive(this.#state.sessions[0].id)
+    }
+  }
+
+  /*────────────────────────────────────────────────────────────────────
+    Ganti judul (§7.5): PATCH /api/session/:id → 404 upstream (dibuktikan),
+    degradasi jujur: gagal dicatat, tidak berpura-pura tersimpan.
+  ─────────────────────────────────────────────────────────────────────*/
+  async renameSession(id: string, title: string): Promise<{ ok: boolean; error?: string }> {
+    try {
+      await updateSession(id, { title })
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : 'Gagal mengganti judul.' }
+    }
+  }
+
+  /*────────────────────────────────────────────────────────────────────
+    Buat sesi dengan inisial (§7.8): POST /api/session {title, model, directory}.
+  ─────────────────────────────────────────────────────────────────────*/
+  async createAndActivateWithInit(init: { title: string; model?: { id: string; providerID: string }; directory?: string }): Promise<void> {
+    const { createSession } = await import('./apiClient')
+    const s = await createSession(init)
+    await this.loadSessions()
+    await this.setActive(s.id)
   }
 
   /*────────────────────────────────────────────────────────────────────

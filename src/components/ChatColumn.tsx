@@ -2,9 +2,11 @@
 // Event SSE tidak dirender langsung; REST via sessionStore adalah kebenaran.
 
 import * as React from 'react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { RenderBlock } from './blocks'
 import { Composer } from './Composer'
+import { Underbar } from './Underbar'
+import { UsageSheet } from './UsageSheet'
 import { sessionStore } from '../lib/sessionStore'
 import { useSessionStore } from '../lib/useSessionStore'
 import { replyPermission } from '../lib/apiClient'
@@ -13,6 +15,7 @@ export function ChatColumn() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const state = useSessionStore()
   const active = state.active
+  const [usageOpen, setUsageOpen] = useState(false)
 
   const onPermissionReply = (reply: 'accept' | 'reject') => {
     const pending = state.blocks.find((b) => b.kind === 'permission' && (b.payload as { status?: string }).status === 'pending')
@@ -64,6 +67,13 @@ export function ChatColumn() {
         </div>
       </div>
       <Composer />
+      <Underbar onOpenUsage={() => setUsageOpen(true)} />
+      {usageOpen && (
+        <>
+          <div className="fx-usage-backdrop" onClick={() => setUsageOpen(false)} />
+          <UsageSheet onClose={() => setUsageOpen(false)} />
+        </>
+      )}
     </div>
   )
 }
