@@ -22,7 +22,7 @@ export function Shell() {
 
   return (
     <div className="fx-app-shell">
-      <SessionBar />
+      <SessionBar open={listOpen} onToggle={() => setListOpen((o) => !o)} />
 
       {listOpen && (
         <>

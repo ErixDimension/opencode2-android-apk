@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Gate } from './components/Gate'
 import { Shell } from './components/Shell'
 import { getAuthState } from './lib/apiClient'
+import { eventStream } from './lib/eventStream'
 import { sessionStore } from './lib/sessionStore'
 
 type View = 'loading' | 'gate' | 'app'
@@ -41,6 +42,9 @@ export default function App() {
   useEffect(() => {
     if (view === 'app') {
       void (async () => {
+        // Nyalakan stream SSE agar event session.* / permission tiba ke store
+        // (titik status bar + polling penjemput balasan bergantung padanya).
+        eventStream.start()
         // loadSessions dulu, baru loadFirstActive — sesi pertama dipilih
         // hanya setelah daftar benar-benar tiba dari adaptor.
         await sessionStore.bootstrap()

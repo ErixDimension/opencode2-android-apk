@@ -30,7 +30,15 @@ export function ChatColumn() {
     }
   }, [state])
 
-  const loadOlder = () => { sessionStore.loadOlder() }
+  const loadOlder = () => {
+    // §0.17 — prepend halaman lebih lama di puncak; pertahankan posisi scroll
+    // relatif ke bagian atas tulang (konten baru masuk di atas).
+    const el = scrollRef.current
+    const before = el ? el.scrollHeight : 0
+    void sessionStore.loadOlder().then(() => {
+      if (el) el.scrollTop = el.scrollHeight - before
+    })
+  }
 
   if (!active) {
     return (
@@ -51,17 +59,17 @@ export function ChatColumn() {
     <div className="fx-col">
       <div className="fx-scroll" ref={scrollRef}>
         <div className="fx-spine">
+          {state.cursor?.next && (
+            <div className="flex justify-center mt-2 mb-4">
+              <button className="fx-load-older" onClick={loadOlder}>Muat lebih lama</button>
+            </div>
+          )}
           <div className="fx-flow" style={{ height: `var(--fx-progress)` }} />
           {state.blocks.map((block) => (
             <React.Fragment key={block.id}>
               <RenderBlock block={block} onPermissionReply={onPermissionReply} />
             </React.Fragment>
           ))}
-          {state.cursor?.next && (
-            <div className="flex justify-center mb-6">
-              <button className="fx-load-older" onClick={loadOlder}>Muat lebih lama</button>
-            </div>
-          )}
         </div>
       </div>
       <Composer />

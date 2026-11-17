@@ -74,6 +74,7 @@ export class SessionStore {
   #abort: AbortController | null = null
   #pollTimer: ReturnType<typeof setTimeout> | null = null
   #pollDeadline: number | null = null
+  #awaitingReply: boolean = false
 
   constructor() {
     this.#wireEvents()
@@ -109,15 +110,22 @@ export class SessionStore {
       // supaya sesi latar yang bekerja juga tampil "Sedang bekerja" di daftar.
       // Upstream tidak menyediakan field status pada record sesi (proses discovery),
       // jadi event SSE adalah satu-satunya sinyal; tanpa event → idle (jujur).
+      // §7.3/7.4 — penanda busy per sesi dari event session.*.
+      // started → busy; succeeded/failed → idle.
+      // step.ended / text.ended hanya memicu refetch (menyala di tengah run),
+      // JANGAN mematikan busy (penanda akhir run tetap succeeded/failed).
       const isBusyStart =
         type === 'session.execution.started' || type === 'session.step.started' || type === 'session.text.started'
-      const isBusyEnd =
-        type === 'session.execution.succeeded' || type === 'session.execution.failed' ||
-        type === 'session.step.ended' || type === 'session.text.ended'
+      const isBusyEnd = type === 'session.execution.succeeded' || type === 'session.execution.failed'
       if (sessionID && (isBusyStart || isBusyEnd)) {
         this.#set({
           sessionBusy: { ...this.#state.sessionBusy, [sessionID]: isBusyStart },
         })
+        const activeID = this.#state.active?.id
+        if (sessionID === activeID) this.#requestRefetch('busy-idle')
+        return
+      }
+      if (sessionID && (type === 'session.step.ended' || type === 'session.text.ended')) {
         const activeID = this.#state.active?.id
         if (sessionID === activeID) this.#requestRefetch('busy-idle')
         return
@@ -200,6 +208,7 @@ export class SessionStore {
     this.#abort?.abort()
     this.#abort = new AbortController()
     this.#stopPolling()
+    this.#awaitingReply = false
     this.#set({ active: found, blocks: [], messages: [], cursor: null, loading: true, activeRun: false })
     await this.#loadMessages(0)
     this.#set({ loading: false })
@@ -225,15 +234,18 @@ export class SessionStore {
     const active = this.#state.active
     if (!active) return
     const cursor = offset === 0 ? null : this.#state.cursor?.next
-    const page = await getMessages(active.id, PAGE_SIZE, 'asc', cursor)
-    const blocks = mapMessages(page.data)
+    // §0.17 — muat awal = 50 pesan TERAKHIR (order desc), balik agar tampilan
+    // menaik; cursor.next = halaman lebih lama (prepend saat "Muat lebih lama").
+    const page = await getMessages(active.id, PAGE_SIZE, 'desc', cursor)
+    const oldestFirst = [...page.data].reverse()
+    const blocks = mapMessages(oldestFirst)
     const existing = offset === 0 ? [] : this.#state.messages
-    const allMessages = offset === 0 ? page.data : [...existing, ...page.data]
+    const allMessages = offset === 0 ? oldestFirst : [...oldestFirst, ...existing]
     this.#set({
       messages: allMessages,
-      blocks: offset === 0 ? blocks : [...this.#state.blocks, ...blocks],
+      blocks: offset === 0 ? blocks : [...blocks, ...this.#state.blocks],
       cursor: page.cursor,
-      activeRun: this.#inferRun(page.data),
+      activeRun: this.#inferRun(allMessages),
     })
     this.#refreshContext()
   }
@@ -246,9 +258,21 @@ export class SessionStore {
   }
 
   #inferRun(messages: Message[]): boolean {
-    const last = messages[messages.length - 1]
-    if (!last || last.type !== 'assistant') return false
-    return !(last as { time: { completed?: number } }).time.completed
+    if (messages.length === 0) return false
+    let lastAssistant = -1
+    let lastUser = -1
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].type === 'assistant' && lastAssistant === -1) lastAssistant = i
+      if (messages[i].type === 'user' && lastUser === -1) lastUser = i
+      if (lastAssistant !== -1 && lastUser !== -1) break
+    }
+    // Pesan user lebih baru dari assistant terakhir = menunggu balasan → masih berjalan.
+    if (lastUser > lastAssistant) return true
+    // Tidak ada assistant sama sekali → tidak ada run yang terlacak.
+    if (lastAssistant === -1) return false
+    // Assistant terakhir: masih berjalan jika belum selesai (completed/finish kosong).
+    const t = messages[lastAssistant] as { time: { completed?: number }; finish?: string; rawFinish?: string }
+    return !t.time?.completed
   }
 
   async #refreshActive(): Promise<void> {
@@ -275,6 +299,10 @@ export class SessionStore {
     if (!active) return
     const { sendPrompt } = await import('./apiClient')
     await sendPrompt(active.id, text)
+    // Setelah kirim, keadaan "belum ada balasan" = SEDANG MENUNGGU, bukan
+    // selesai. Tandai supaya polling tidak mati pada tick pertama (pesan
+    // user baru mungkin belum muncul di server saat pertama kali dimuat).
+    this.#awaitingReply = true
     // Jemput balasan: polling berkala sampai reply assistant tiba atau timeout 120 detik.
     // SSE = akselerator (refetch via event wiring); REST = kebenaran.
     this.#requestRefetch('busy-idle')
@@ -286,6 +314,7 @@ export class SessionStore {
     if (!active) return
     await interruptSession(active.id)
     this.#stopPolling()
+    this.#awaitingReply = false
     this.#requestRefetch('immediate')
   }
 
@@ -302,20 +331,20 @@ export class SessionStore {
   #tick(): void {
     if (this.#pollDeadline == null || Date.now() > this.#pollDeadline) {
       this.#stopPolling()
+      this.#awaitingReply = false
       return
     }
-    const before = this.#state.messages.length
     void this.#loadMessages(0).then(() => {
-      const last = this.#state.messages[this.#state.messages.length - 1]
-      const assistantArrived =
-        this.#state.messages.length > before &&
-        last &&
-        last.type === 'assistant'
-      const runSelesai = !this.#state.activeRun
-      if (assistantArrived || runSelesai) {
+      const stillRunning = this.#state.active ? this.#inferRun(this.#state.messages) : false
+      // Berhenti hanya jika run benar-benar selesai dan tidak ada balasan
+      // yang masih kita tunggu (menghindari mati terlalu awal saat pesan user
+      // baru belum muncul di server pada tick pertama sesudah kirim).
+      if (!stillRunning && !this.#awaitingReply) {
         this.#stopPolling()
+        this.#awaitingReply = false
         return
       }
+      this.#awaitingReply = false
       this.#pollTimer = setTimeout(() => this.#tick(), 1750)
     }).catch(() => {
       this.#pollTimer = setTimeout(() => this.#tick(), 1750)

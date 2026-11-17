@@ -1,14 +1,21 @@
 // SessionBar.tsx — §7.1: bar sesi penuh lebar ±40px di atas kolom chat.
-// Satu target sentuh (selain chevron visual); pintu masuk tunggal daftar sesi.
-import { useState, useEffect } from 'react'
+// Seluruh bar adalah target sentuh (§7.1): klik di mana pun membuka/menutup
+// daftar sesi. Kondisi buka/tutup adalah satu sumber kebenaran di Shell,
+// yang dilewatkan ke sini sebagai prop `open`/`onToggle` (tidak lagi state
+// lokal yatim).
+import { useEffect, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { eventStream } from '../lib/eventStream'
 import { useSessionStore } from '../lib/useSessionStore'
 
-export function SessionBar() {
+interface Props {
+  open: boolean
+  onToggle: () => void
+}
+
+export function SessionBar({ open, onToggle }: Props) {
   const state = useSessionStore()
   const active = state.active
-  const [open, setOpen] = useState(false)
   const [online, setOnline] = useState(eventStream.getState() === 'online')
 
   useEffect(() => {
@@ -16,10 +23,14 @@ export function SessionBar() {
     return () => off()
   }, [])
 
-  const running = state.activeRun ? 1 : 0 // hanya sesi aktif yang terlacak store; jujur, tidak diarang
+  // §7.3/7.4 — lencana = sesi LAIN (selain aktif) yang sedang busy menurut
+  // event session.*. Format chip ringkas, tidak dirender bila nol.
+  const otherBusy = Object.entries(state.sessionBusy).filter(
+    ([id, b]) => b && id !== state.active?.id
+  ).length
 
   return (
-    <div className="fx-sessionbar" role="region" aria-label="Daftar sesi">
+    <div className="fx-sessionbar" role="region" aria-label="Daftar sesi" onClick={onToggle}>
       <div className="fx-sessionbar__body">
         <span
           className={`fx-sessionbar__dot ${online ? 'online' : ''}`}
@@ -41,16 +52,16 @@ export function SessionBar() {
             (tanpa sesi)
           </span>
         )}
-        {running > 0 && (
-          <span className="fx-sessionbar__badge" aria-label="Sesi sedang berproses">
-            {running} sesi berproses
+        {otherBusy > 0 && (
+          <span className="fx-sessionbar__badge" aria-label="Sesi lain sedang berproses">
+            {otherBusy} PROSES
           </span>
         )}
       </div>
       <button
         type="button"
         className="fx-sessionbar__chevron"
-        onClick={() => setOpen((o) => !o)}
+        onClick={(e) => { e.stopPropagation(); onToggle() }}
         aria-label={open ? 'Tutup daftar sesi' : 'Buka daftar sesi'}
         aria-expanded={open}
         title={open ? 'Tutup daftar sesi' : 'Buka daftar sesi'}

@@ -450,12 +450,52 @@ async function main() {
     )
     assert('H15 antre permission bukan literal 1 dari {1}', h15QueueReal, `queueReal=${h15QueueReal}`)
 
+    // ================= N4.4.2: H16 =================
+
+    const sessionBarSrc = readFileRel('src/components/SessionBar.tsx')
+    const shellSrc2 = readFileRel('src/components/Shell.tsx')
+    const appSrc = readFileRel('src/App.tsx')
+    const storeSrc2 = readFileRel('src/lib/sessionStore.ts')
+
+    // ---- H16a: keadaan buka daftar dipakai bersama (SessionBar tanpa
+    //          useState lokal open yamat; toggle ter-wire ke Shell) ----
+    const h16aBarNoLocalOpen = !/useState\(\s*false\s*\)/.test(sessionBarSrc)
+    const h16aBarWire = sessionBarSrc.includes('onToggle')
+    const h16aShellWire = shellSrc2.includes('SessionBar open={listOpen}') && shellSrc2.includes('setListOpen')
+    assert(
+      'H16a keadaan buka daftar dipakai bersama — SessionBar tanpa useState lokal open yamat; toggle ter-wire ke Shell',
+      h16aBarNoLocalOpen && h16aBarWire && h16aShellWire,
+      `barNoLocalOpen=${h16aBarNoLocalOpen} barWire=${h16aBarWire} shellWire=${h16aShellWire}`
+    )
+
+    // ---- H16b: eventStream.start() dipanggil di src/ (App/Shell/store) ----
+    const h16b = appSrc.includes('eventStream.start()') || shellSrc2.includes('eventStream.start()') || storeSrc2.includes('eventStream.start()')
+    assert('H16b eventStream.start() dipanggil di src/', h16b, `startCalled=${h16b}`)
+
+    // ---- H16c: syarat berhenti polling tidak menganggap "pesan terakhir
+    //          user" sebagai selesai ----
+    const h16c = storeSrc2.includes('lastUser > lastAssistant') || storeSrc2.includes("last.type === 'user'")
+    assert(
+      'H16c polling tidak mati saat pesan terakhir = user (masih menunggu)',
+      h16c,
+      `waitLogic=${h16c}`
+    )
+
+    // ---- H16d: muat awal pesan memakai arah desc (50 terbaru) ----
+    const h16d = storeSrc2.includes("PAGE_SIZE, 'desc'") || storeSrc2.includes('PAGE_SIZE, "desc"')
+    const h16dReverse = storeSrc2.includes('.reverse()')
+    assert(
+      'H16d muat awal = 50 pesan TERAKHIR (order desc) lalu dibalik untuk tampil menaik',
+      h16d && h16dReverse,
+      `desc=${h16d} reverse=${h16dReverse}`
+    )
+
   } finally {
     adapter.kill()
     cleanup()
   }
 
-  log(`HASIL: ${failures === 0 ? 'SEMUA PASS (H0-H15)' : failures + ' ASSERTION GAGAL'}`)
+  log(`HASIL: ${failures === 0 ? 'SEMUA PASS (H0-H16)' : failures + ' ASSERTION GAGAL'}`)
   process.exit(failures === 0 ? 0 : 1)
 }
 
