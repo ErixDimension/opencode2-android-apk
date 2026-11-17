@@ -15,9 +15,22 @@ export default function App() {
     let cancelled = false
     void (async () => {
       try {
-        const state = await getAuthState()
+        const auth = await getAuthState()
         if (cancelled) return
-        setView(state.state === 'ready' ? 'app' : 'gate')
+        if (auth.state === 'setup-required') {
+          setView('gate')
+          return
+        }
+        // 'ready' = kredensial adaptor tersimpan, BUKAN berarti sudah ada sesi
+        // cookie flux_session yang valid. Uji endpoint butuh autentikasi;
+        // 401 = belum login → arahkan ke gerbang untuk membuat cookie.
+        const res = await fetch('/api/session?limit=1', {
+          credentials: 'same-origin',
+          cache: 'no-store',
+          headers: { accept: 'application/json' },
+        })
+        if (cancelled) return
+        setView(res.ok ? 'app' : 'gate')
       } catch {
         if (!cancelled) setView('gate')
       }
