@@ -679,28 +679,28 @@ async function main() {
       `auto=${h19Auto} padding=${h19Padding} box=${h19Box} noVar=${h19NoVar}`
     )
 
-    // ---- H19b: MarqueeText dipakai judul/model/meta + keyframes ada ----
+    // ---- H19b: MarqueeText dipakai judul/meta + keyframes ada ----
     const h19MarqueeFn = /function\s+MarqueeText\s*\(/.test(cardSrc5)
     const h19MarqueeUses = (cardSrc5.match(/<MarqueeText\b/g) ?? []).length
-    const h19MarqueeTargets = ['fx-session-card__title', 'fx-session-card__model', 'fx-session-card__meta']
+    const h19MarqueeTargets = ['fx-session-card__title', 'fx-session-card__meta']
       .every((cls) => cardSrc5.includes(`className="${cls}"`))
     const h19Keyframes =
       /@keyframes\s+fx-marquee\s*\{[\s\S]*?var\(--fx-shift\)/.test(cssSrc5)
     assert(
-      'H19b MarqueeText ada + dipakai judul/model/meta di SessionCard; @keyframes fx-marquee memakai --fx-shift',
-      h19MarqueeFn && h19MarqueeUses >= 3 && h19MarqueeTargets && h19Keyframes,
+      'H19b MarqueeText ada + dipakai judul/meta di SessionCard; @keyframes fx-marquee memakai --fx-shift',
+      h19MarqueeFn && h19MarqueeUses >= 2 && h19MarqueeTargets && h19Keyframes,
       `fn=${h19MarqueeFn} uses=${h19MarqueeUses} targets=${h19MarqueeTargets} keyframes=${h19Keyframes}`
     )
 
-    // ---- H19c: baris model SELALU dirender (tanpa kondisional yang menghilangkannya) ----
-    const h19ModelRow = /<MarqueeText\b[^>]*className="fx-session-card__model"[^>]*text=\{modelText\}/.test(cardSrc5)
-    const h19NoConditionalModelRow =
-      !/session\.model\?\.id\s*&&\s*<[^>]*fx-session-card__model/.test(cardSrc5) &&
-      !/session\.model\s*&&\s*<[^>]*fx-session-card__model/.test(cardSrc5)
+    // ---- H19c: baris model kartu pensiun (N4.4.8) ----
+    const h19NoModelRow = !cardSrc5.includes('fx-session-card__model')
+    const h19NoModelText =
+      !cardSrc5.includes("from '../lib/modelDisplayName'") &&
+      !/modelText/.test(cardSrc5)
     assert(
-      'H19c baris model dirender tanpa kondisional; sesi tanpa model tetap punya baris kosong setinggi 15px',
-      h19ModelRow && h19NoConditionalModelRow,
-      `modelRow=${h19ModelRow} unconditional=${h19NoConditionalModelRow}`
+      'H19c baris model kartu sudah dihapus; tidak ada elemen/teks model di SessionCard',
+      h19NoModelRow && h19NoModelText,
+      `noModelRow=${h19NoModelRow} noModelText=${h19NoModelText}`
     )
 
     // ================= N4.4.6: H20 =================
@@ -712,7 +712,7 @@ async function main() {
     const composerSrc6 = readFileRel('src/components/Composer.tsx')
     const helperSrc6 = readFileRel('src/lib/modelDisplayName.ts')
 
-    // ---- H20a: kartu tinggi alami; baris model/meta tetap 15px ----
+    // ---- H20a: kartu tinggi alami; baris meta tetap 15px ----
     const h20Card = (cssSrc6.match(/\.fx-session-card\s*\{[^}]*\}/) ?? [''])[0]
     const h20Natural =
       /height:\s*auto/.test(h20Card) &&
@@ -720,13 +720,13 @@ async function main() {
       !/min-height:\s*var\(--fx-card-h\)/.test(h20Card) &&
       !/max-height:\s*var\(--fx-card-h\)/.test(h20Card)
     const h20Rows =
-      (cssSrc6.match(/\.fx-session-card__modelrow,\s*\.fx-session-card__metarow\s*\{[^}]*\}/) ?? [''])[0]
+      (cssSrc6.match(/\.fx-session-card__metarow\s*\{[^}]*\}/) ?? [''])[0]
     const h20RowsLocked =
       /height:\s*15px/.test(h20Rows) &&
       /min-height:\s*15px/.test(h20Rows) &&
       /max-height:\s*15px/.test(h20Rows)
     assert(
-      'H20a .fx-session-card tinggi alami (tanpa kunci var --fx-card-h); pembungkus baris model/meta tetap 15px',
+      'H20a .fx-session-card tinggi alami (tanpa kunci var --fx-card-h); pembungkus baris meta tetap 15px',
       h20Natural && h20RowsLocked,
       `natural=${h20Natural} rowsLocked=${h20RowsLocked}`
     )
@@ -749,15 +749,11 @@ async function main() {
       `cycle=${h20Cycle} noDistance=${h20NoDistanceDuration} syncDelay=${h20SyncDelay} quiet=${h20Quiet}`
     )
 
-    // ---- H20c: modelDisplayName dipakai kartu/dialog/session bar; label
-    //      provider terpisah tidak dirender di baris model dialog ----
+    // ---- H20c: modelDisplayName tetap di dialog/session bar/composer;
+    //      label provider terpisah tidak dirender di baris model dialog ----
     const h20Helper =
       helperSrc6.includes('export function modelDisplayName') &&
       helperSrc6.includes("lastIndexOf('/')")
-    const h20CardName =
-      cardSrc6.includes("from '../lib/modelDisplayName'") &&
-      /modelDisplayName\(modelID\)/.test(cardSrc6) &&
-      /const modelID = session\.model\?\.id/.test(cardSrc6)
     const h20DialogName =
       dialogSrc6.includes("from '../lib/modelDisplayName'") &&
       /modelDisplayName\(m\.id\)/.test(dialogSrc6) &&
@@ -770,9 +766,9 @@ async function main() {
       composerSrc6.includes("from '../lib/modelDisplayName'") &&
       /modelDisplayName\(activeModelID\)/.test(composerSrc6)
     assert(
-      'H20c modelDisplayName ada + dipakai kartu/dialog/session bar/composer; label provider terpisah tidak dirender di dialog',
-      h20Helper && h20CardName && h20DialogName && h20BarName && h20ComposerName,
-      `helper=${h20Helper} card=${h20CardName} dialog=${h20DialogName} bar=${h20BarName} composer=${h20ComposerName}`
+      'H20c modelDisplayName tetap ada + dipakai dialog/session bar/composer; label provider terpisah tidak dirender di dialog',
+      h20Helper && h20DialogName && h20BarName && h20ComposerName,
+      `helper=${h20Helper} dialog=${h20DialogName} bar=${h20BarName} composer=${h20ComposerName}`
     )
 
     // ================= N4.4.7: H21 =================
@@ -800,11 +796,11 @@ async function main() {
       `noAbsolute=${h21NoAbsolute} padding=${h21Padding} flexRow=${h21FlexRow}`
     )
 
-    // ---- H21b: tiga baris tetap 24/15/15 + overflow hidden; model tanpa kondisional ----
+    // ---- H21b: dua baris tetap 24/15 + overflow hidden; baris model pensiun ----
     const h21Row1 = (cssSrc7.match(/\.fx-session-card__row1\s*\{[^}]*\}/) ?? [''])[0]
     const h21Title = (cssSrc7.match(/\.fx-session-card__title\s*\{[^}]*\}/) ?? [''])[0]
     const h21Rows =
-      (cssSrc7.match(/\.fx-session-card__modelrow,\s*\.fx-session-card__metarow\s*\{[^}]*\}/) ?? [''])[0]
+      (cssSrc7.match(/\.fx-session-card__metarow\s*\{[^}]*\}/) ?? [''])[0]
     const h21TitleRowLocked =
       /height:\s*24px/.test(h21Row1) &&
       /line-height:\s*24px/.test(h21Row1) &&
@@ -816,14 +812,13 @@ async function main() {
       /height:\s*15px/.test(h21Rows) &&
       /line-height:\s*15px/.test(h21Rows) &&
       /overflow:\s*hidden/.test(h21Rows)
-    const h21ModelUnconditional =
-      /<MarqueeText\b[^>]*className="fx-session-card__model"[^>]*text=\{modelText\}/.test(cardSrc7) &&
-      !/session\.model\?\.id\s*&&\s*<[^>]*fx-session-card__model/.test(cardSrc7) &&
-      !/session\.model\s*&&\s*<[^>]*fx-session-card__model/.test(cardSrc7)
+    const h21NoModelRow =
+      !cardSrc7.includes('fx-session-card__model') &&
+      !/modelText/.test(cardSrc7)
     assert(
-      'H21b tiga baris tetap 24/15/15 + overflow hidden; baris model tetap dirender tanpa kondisional',
-      h21TitleRowLocked && h21TextRowsLocked && h21ModelUnconditional,
-      `title=${h21TitleRowLocked} lines=${h21TextRowsLocked} model=${h21ModelUnconditional}`
+      'H21b dua baris tetap 24/15 + overflow hidden; baris model kartu sudah dihapus',
+      h21TitleRowLocked && h21TextRowsLocked && h21NoModelRow,
+      `title=${h21TitleRowLocked} lines=${h21TextRowsLocked} noModel=${h21NoModelRow}`
     )
 
   } finally {

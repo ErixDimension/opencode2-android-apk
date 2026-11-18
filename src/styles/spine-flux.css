@@ -1158,10 +1158,10 @@
 
 /* 7.3 Kartu sesi — .fx-session-card [data-state: active|run|idle]
    N4.4.7 — tinggi ALAMI (height:auto), bukan kotak 68px yang dikunci.
-   Keseragaman datang dari struktur: padding 12px 16px identik + tiga baris
-   tetap (judul 24px, model 15px, meta 15px), semuanya overflow:hidden.
-   Kartu flex row: node 28px di kiri + kolom isi fleksibel. Cincin status
-   tetap inset box-shadow agar tidak menambah tinggi. */
+   Keseragaman datang dari struktur: padding 12px 16px identik + dua baris
+   tetap (judul 24px, meta 15px), semuanya overflow:hidden. Kartu flex row:
+   node 28px di kiri + kolom isi fleksibel. Cincin status tetap inset box-shadow
+   agar tidak menambah tinggi. Baris model kartu dihapus pada N4.4.8. */
 .fx-session-card {
   display: flex;
   flex-direction: row;
@@ -1302,20 +1302,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* Zona tukar 30px: model+meta (15+15), run, konsol rename, konfirmasi hapus.
-   Semua varian berketinggian SAMA dan dikunci min/max; tidak ada yang
-   menambah tinggi kartu. */
+/* Zona meta normal 15px. Konsol rename/konfirmasi hapus memakai 30px dan
+   hanya selama keadaan itu terbuka; kartu normal tetap dua baris. */
 .fx-session-card__zone {
-  height: 30px;
-  min-height: 30px;
-  max-height: 30px;
+  height: auto;
   flex: none;
   display: flex;
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
 }
-.fx-session-card__modelrow,
 .fx-session-card__metarow {
   height: 15px;
   min-height: 15px;
@@ -1327,7 +1323,6 @@
   min-width: 0;
   overflow: hidden;
 }
-.fx-session-card__model,
 .fx-session-card__meta {
   display: block;
   flex: 1 1 auto;
@@ -1340,7 +1335,6 @@
   overflow: hidden;
   font-family: ui-monospace, Menlo, monospace;
 }
-.fx-session-card__model { color: var(--fx-muted); font-size: 12.5px; }
 .fx-session-card__meta { color: var(--fx-muted); font-size: 12px; }
 /* §2 Teks berjalan: hanya aktif bila lebar teks > lebar wadah. */
 .fx-marquee {

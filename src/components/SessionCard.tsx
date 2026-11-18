@@ -1,9 +1,9 @@
-// SessionCard.tsx — §1/§2/§3 N4.4.7: kartu tinggi ALAMI (height:auto).
-// Keseragaman dari struktur: kartu flex row, node 28px + kolom isi tiga baris
-// tetap (judul 24px, model 15px, meta 15px), padding 12px 16px. Baris model
-// SELALU ada. MarqueeText v2: satu siklus 11 detik dengan fase negatif dari
-// jam bersama, sehingga semua teks bergerak/berhenti seirama. Nama model
-// memakai modelDisplayName (tanpa prefix provider); id penuh di title.
+// SessionCard.tsx — §1/§2/§3 N4.4.8: kartu tinggi ALAMI (height:auto).
+// Keseragaman dari struktur: kartu flex row, node 28px + kolom isi dua baris
+// tetap (judul 24px, meta 15px), padding 12px 16px. Baris model di muka kartu
+// dihapus; helper modelDisplayName tetap dipakai di session bar, dialog,
+// composer, dan usage sheet. MarqueeText v2: satu siklus 11 detik dengan fase
+// negatif dari jam bersama, sehingga semua teks bergerak/berhenti seirama.
 import {
   useState,
   useCallback,
@@ -14,7 +14,6 @@ import {
 } from 'react'
 import { Edit2, Trash2, Bot, BarChart3, Undo2 } from 'lucide-react'
 import { sessionStore, type SessionView } from '../lib/sessionStore'
-import { modelDisplayName } from '../lib/modelDisplayName'
 
 interface Props {
   session: SessionView
@@ -216,9 +215,6 @@ export function SessionCard({
 
   const statusChip = run ? 'run' : isActive ? 'active' : 'idle'
   const directory = session.location?.directory ?? ''
-  const modelID = session.model?.id ?? ''
-  // Baris model SELALU ada; tanpa model cukup teks kosong setinggi baris.
-  const modelText = modelDisplayName(modelID)
 
   const metaParts: string[] = []
   const rel = relativeTime(session.updatedAt)
@@ -379,23 +375,18 @@ export function SessionCard({
               </button>
             </div>
           ) : (
-            <>
-              <div className="fx-session-card__modelrow">
-                <MarqueeText className="fx-session-card__model" text={modelText} title={modelID} />
-              </div>
-              <div className="fx-session-card__metarow">
-                {run ? (
-                  <div className="fx-session-card__run">
-                    Sedang bekerja
-                    <span className="fx-session-card__run-dot" aria-hidden={true} />
-                    <span className="fx-session-card__run-dot" aria-hidden={true} />
-                    <span className="fx-session-card__run-dot" aria-hidden={true} />
-                  </div>
-                ) : (
-                  <MarqueeText className="fx-session-card__meta" text={metaText} />
-                )}
-              </div>
-            </>
+            <div className="fx-session-card__metarow">
+              {run ? (
+                <div className="fx-session-card__run">
+                  Sedang bekerja
+                  <span className="fx-session-card__run-dot" aria-hidden={true} />
+                  <span className="fx-session-card__run-dot" aria-hidden={true} />
+                  <span className="fx-session-card__run-dot" aria-hidden={true} />
+                </div>
+              ) : (
+                <MarqueeText className="fx-session-card__meta" text={metaText} />
+              )}
+            </div>
           )}
         </div>
 
