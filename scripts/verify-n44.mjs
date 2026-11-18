@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // scripts/verify-n44.mjs — harness verifikasi N4.4 (panel sesi + usage + permission).
 // Boot instance adapter scratch (state + port di luar repo), sajikan dist hasil
-// build, jalankan H0-H20. Tidak pernah mencetak password/token/rahasia.
+// build, jalankan H0-H21. Tidak pernah mencetak password/token/rahasia.
 import http from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -667,14 +667,16 @@ async function main() {
     const cardSrc5 = readFileRel('src/components/SessionCard.tsx')
     const cssSrc5 = readFileRel('src/styles/spine-flux.css')
 
-    // ---- H19a: satu tinggi kartu --fx-card-h + border-box ----
+    // ---- H19a: tinggi alami height:auto + padding konsisten + border-box ----
     const h19Base = (cssSrc5.match(/\.fx-session-card\s*\{[^}]*\}/) ?? [''])[0]
-    const h19Var = /--fx-card-h:\s*68px/.test(cssSrc5)
-    const h19Height = /height:\s*var\(--fx-card-h\)/.test(h19Base) && /box-sizing:\s*border-box/.test(h19Base)
+    const h19Auto = /height:\s*auto/.test(h19Base)
+    const h19Padding = /padding:\s*12px\s+16px/.test(h19Base)
+    const h19Box = /box-sizing:\s*border-box/.test(h19Base)
+    const h19NoVar = !/--fx-card-h/.test(cssSrc5)
     assert(
-      'H19a .fx-session-card memakai --fx-card-h: 68px + height variabel + box-sizing border-box',
-      h19Var && h19Height,
-      `var=${h19Var} height=${h19Height}`
+      'H19a .fx-session-card tinggi alami (height:auto) + padding 12px 16px + box-sizing border-box; --fx-card-h pensiun',
+      h19Auto && h19Padding && h19Box && h19NoVar,
+      `auto=${h19Auto} padding=${h19Padding} box=${h19Box} noVar=${h19NoVar}`
     )
 
     // ---- H19b: MarqueeText dipakai judul/model/meta + keyframes ada ----
@@ -710,12 +712,13 @@ async function main() {
     const composerSrc6 = readFileRel('src/components/Composer.tsx')
     const helperSrc6 = readFileRel('src/lib/modelDisplayName.ts')
 
-    // ---- H20a: tinggi kartu dikunci tiga lapis + baris model/meta ----
+    // ---- H20a: kartu tinggi alami; baris model/meta tetap 15px ----
     const h20Card = (cssSrc6.match(/\.fx-session-card\s*\{[^}]*\}/) ?? [''])[0]
-    const h20CardLock =
-      /min-height:\s*var\(--fx-card-h\)/.test(h20Card) &&
-      /max-height:\s*var\(--fx-card-h\)/.test(h20Card) &&
-      /flex:\s*none/.test(h20Card)
+    const h20Natural =
+      /height:\s*auto/.test(h20Card) &&
+      !/height:\s*var\(--fx-card-h\)/.test(h20Card) &&
+      !/min-height:\s*var\(--fx-card-h\)/.test(h20Card) &&
+      !/max-height:\s*var\(--fx-card-h\)/.test(h20Card)
     const h20Rows =
       (cssSrc6.match(/\.fx-session-card__modelrow,\s*\.fx-session-card__metarow\s*\{[^}]*\}/) ?? [''])[0]
     const h20RowsLocked =
@@ -723,9 +726,9 @@ async function main() {
       /min-height:\s*15px/.test(h20Rows) &&
       /max-height:\s*15px/.test(h20Rows)
     assert(
-      'H20a .fx-session-card min-height & max-height = var(--fx-card-h) + flex:none; pembungkus baris model/meta dikunci 15px',
-      h20CardLock && h20RowsLocked,
-      `cardLock=${h20CardLock} rowsLocked=${h20RowsLocked}`
+      'H20a .fx-session-card tinggi alami (tanpa kunci var --fx-card-h); pembungkus baris model/meta tetap 15px',
+      h20Natural && h20RowsLocked,
+      `natural=${h20Natural} rowsLocked=${h20RowsLocked}`
     )
 
     // ---- H20b: marquee v2 — siklus 11s bersama, delay negatif sinkron,
@@ -772,12 +775,63 @@ async function main() {
       `helper=${h20Helper} card=${h20CardName} dialog=${h20DialogName} bar=${h20BarName} composer=${h20ComposerName}`
     )
 
+    // ================= N4.4.7: H21 =================
+
+    const cardSrc7 = readFileRel('src/components/SessionCard.tsx')
+    const cssSrc7 = readFileRel('src/styles/spine-flux.css')
+    const h21Card = (cssSrc7.match(/\.fx-session-card\s*\{[^}]*\}/) ?? [''])[0]
+
+    // ---- H21a: tidak ada kunci absolut; padding konsisten; kartu flex row ----
+    const h21NoAbsolute =
+      /height:\s*auto/.test(h21Card) &&
+      !/height:\s*var\(--fx-card-h\)/.test(h21Card) &&
+      !/min-height\s*:/.test(h21Card) &&
+      !/max-height\s*:/.test(h21Card) &&
+      !/flex:\s*none/.test(h21Card) &&
+      !/--fx-card-h/.test(cssSrc7)
+    const h21Padding = /padding:\s*12px\s+16px/.test(h21Card)
+    const h21FlexRow =
+      /display:\s*flex/.test(h21Card) &&
+      /flex-direction:\s*row/.test(h21Card) &&
+      /align-items:\s*flex-start/.test(h21Card)
+    assert(
+      'H21a .fx-session-card tinggi alami: tanpa height/min-height/max-height/flex:none --fx-card-h; padding 12px 16px; flex row',
+      h21NoAbsolute && h21Padding && h21FlexRow,
+      `noAbsolute=${h21NoAbsolute} padding=${h21Padding} flexRow=${h21FlexRow}`
+    )
+
+    // ---- H21b: tiga baris tetap 24/15/15 + overflow hidden; model tanpa kondisional ----
+    const h21Row1 = (cssSrc7.match(/\.fx-session-card__row1\s*\{[^}]*\}/) ?? [''])[0]
+    const h21Title = (cssSrc7.match(/\.fx-session-card__title\s*\{[^}]*\}/) ?? [''])[0]
+    const h21Rows =
+      (cssSrc7.match(/\.fx-session-card__modelrow,\s*\.fx-session-card__metarow\s*\{[^}]*\}/) ?? [''])[0]
+    const h21TitleRowLocked =
+      /height:\s*24px/.test(h21Row1) &&
+      /line-height:\s*24px/.test(h21Row1) &&
+      /overflow:\s*hidden/.test(h21Row1) &&
+      /height:\s*24px/.test(h21Title) &&
+      /line-height:\s*24px/.test(h21Title) &&
+      /overflow:\s*hidden/.test(h21Title)
+    const h21TextRowsLocked =
+      /height:\s*15px/.test(h21Rows) &&
+      /line-height:\s*15px/.test(h21Rows) &&
+      /overflow:\s*hidden/.test(h21Rows)
+    const h21ModelUnconditional =
+      /<MarqueeText\b[^>]*className="fx-session-card__model"[^>]*text=\{modelText\}/.test(cardSrc7) &&
+      !/session\.model\?\.id\s*&&\s*<[^>]*fx-session-card__model/.test(cardSrc7) &&
+      !/session\.model\s*&&\s*<[^>]*fx-session-card__model/.test(cardSrc7)
+    assert(
+      'H21b tiga baris tetap 24/15/15 + overflow hidden; baris model tetap dirender tanpa kondisional',
+      h21TitleRowLocked && h21TextRowsLocked && h21ModelUnconditional,
+      `title=${h21TitleRowLocked} lines=${h21TextRowsLocked} model=${h21ModelUnconditional}`
+    )
+
   } finally {
     adapter.kill()
     cleanup()
   }
 
-  log(`HASIL: ${failures === 0 ? 'SEMUA PASS (H0-H20)' : failures + ' ASSERTION GAGAL'}`)
+  log(`HASIL: ${failures === 0 ? 'SEMUA PASS (H0-H21)' : failures + ' ASSERTION GAGAL'}`)
   process.exit(failures === 0 ? 0 : 1)
 }
 

@@ -1,9 +1,9 @@
-// SessionCard.tsx — §1/§2/§3 N4.4.6: kartu SOLID. Tinggi SELALU
-// var(--fx-card-h) (68px) dan dikunci min/max/flex, apa pun isinya. Kerangka:
-// node 28px + judul 24px + model 15px + meta 15px. Baris model SELALU ada.
-// Judul/model/meta memakai MarqueeText v2: satu siklus 11 detik dengan fase
-// negatif dari jam bersama, sehingga semua teks bergerak/berhenti seirama.
-// Nama model memakai modelDisplayName (tanpa prefix provider); id penuh di title.
+// SessionCard.tsx — §1/§2/§3 N4.4.7: kartu tinggi ALAMI (height:auto).
+// Keseragaman dari struktur: kartu flex row, node 28px + kolom isi tiga baris
+// tetap (judul 24px, model 15px, meta 15px), padding 12px 16px. Baris model
+// SELALU ada. MarqueeText v2: satu siklus 11 detik dengan fase negatif dari
+// jam bersama, sehingga semua teks bergerak/berhenti seirama. Nama model
+// memakai modelDisplayName (tanpa prefix provider); id penuh di title.
 import {
   useState,
   useCallback,
@@ -240,172 +240,170 @@ export function SessionCard({
       onClick={handleSelect}
       onKeyDown={handleKeySelect}
     >
-      <div className="fx-session-card__top">
-        <span className={`fx-session-card__node ${statusChip}`} aria-hidden="true">
-          <span className="fx-session-card__node-dot" />
-        </span>
+      <span className={`fx-session-card__node ${statusChip}`} aria-hidden="true">
+        <span className="fx-session-card__node-dot" />
+      </span>
 
-        <div className="fx-session-card__content">
-          <div className="fx-session-card__row1">
-            <MarqueeText
-              className="fx-session-card__title"
-              text={session.title ?? '(tanpa judul)'}
-              title={session.title ?? ''}
-            />
-            {hasAlert && (
-              <span className="fx-card-alert" title="Permintaan izin menunggu">
-                izin menunggu
-              </span>
-            )}
-            {statusChip !== 'idle' && (
-              <span className={`fx-session-card__status ${statusChip}`}>
-                {run ? 'PROSES' : 'AKTIF'}
-              </span>
-            )}
+      <div className="fx-session-card__content">
+        <div className="fx-session-card__row1">
+          <MarqueeText
+            className="fx-session-card__title"
+            text={session.title ?? '(tanpa judul)'}
+            title={session.title ?? ''}
+          />
+          {hasAlert && (
+            <span className="fx-card-alert" title="Permintaan izin menunggu">
+              izin menunggu
+            </span>
+          )}
+          {statusChip !== 'idle' && (
+            <span className={`fx-session-card__status ${statusChip}`}>
+              {run ? 'PROSES' : 'AKTIF'}
+            </span>
+          )}
 
-            <div className="fx-session-card__actions">
+          <div className="fx-session-card__actions">
+            <button
+              type="button"
+              title="Ganti nama judul sesi (alias lokal)"
+              onClick={(e) => {
+                e.stopPropagation()
+                setRenameInput(session.title ?? '')
+                setRenaming(true)
+                setDelConfirm(false)
+                setRenameError(null)
+                setModelError(null)
+              }}
+            >
+              <Edit2 size={14} />
+            </button>
+            {isActive && (
               <button
                 type="button"
-                title="Ganti nama judul sesi (alias lokal)"
+                title="Buka statistik sesi"
+                onClick={(e) => { e.stopPropagation(); sessionStore.openUsageSheet() }}
+              >
+                <BarChart3 size={14} />
+              </button>
+            )}
+            <button
+              type="button"
+              className="delete"
+              title="Hapus sesi"
+              onClick={(e) => {
+                e.stopPropagation()
+                setDelConfirm(true)
+                setRenaming(false)
+                setRenameError(null)
+                setModelError(null)
+              }}
+            >
+              <Trash2 size={14} />
+            </button>
+            {session.model?.id && (
+              <button
+                type="button"
+                title="Model: ganti tidak didukung server"
                 onClick={(e) => {
                   e.stopPropagation()
-                  setRenameInput(session.title ?? '')
-                  setRenaming(true)
-                  setDelConfirm(false)
-                  setRenameError(null)
-                  setModelError(null)
+                  setModelError('Ganti model tidak didukung oleh server (PATCH /api/session/:id → 404)')
                 }}
               >
-                <Edit2 size={14} />
+                <Bot size={14} />
               </button>
-              {isActive && (
-                <button
-                  type="button"
-                  title="Buka statistik sesi"
-                  onClick={(e) => { e.stopPropagation(); sessionStore.openUsageSheet() }}
-                >
-                  <BarChart3 size={14} />
-                </button>
-              )}
+            )}
+          </div>
+        </div>
+
+        {/* Zona tukar tetap 30px: model+meta / run / rename / konfirmasi hapus. */}
+        <div className="fx-session-card__zone">
+          {delConfirm ? (
+            <div className="fx-session-card__confirmrow">
+              <span>Hapus sesi ini?</span>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setDelConfirm(false) }}
+              >
+                Batal
+              </button>
               <button
                 type="button"
                 className="delete"
-                title="Hapus sesi"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setDelConfirm(true)
-                  setRenaming(false)
-                  setRenameError(null)
-                  setModelError(null)
-                }}
+                onClick={(e) => { e.stopPropagation(); void handleDelete() }}
               >
-                <Trash2 size={14} />
+                HAPUS
               </button>
-              {session.model?.id && (
+            </div>
+          ) : renaming ? (
+            <div className="fx-session-card__rename">
+              <input
+                value={renameInput}
+                maxLength={80}
+                title={session.titleUpstream ? `judul asli: ${session.titleUpstream}` : undefined}
+                onChange={(e) => setRenameInput(e.target.value)}
+                autoFocus={true}
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => {
+                  e.stopPropagation()
+                  if (e.key === 'Escape') closeRename()
+                  if (e.key === 'Enter') void handleRename()
+                }}
+              />
+              <button
+                type="button"
+                className="save"
+                disabled={!renameInput.trim() || renameInput.trim() === (session.title ?? '')}
+                onClick={(e) => { e.stopPropagation(); void handleRename() }}
+              >
+                SIMPAN
+              </button>
+              {session.alias && (
                 <button
                   type="button"
-                  title="Model: ganti tidak didukung server"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setModelError('Ganti model tidak didukung oleh server (PATCH /api/session/:id → 404)')
-                  }}
+                  className="icon"
+                  title={`Kembalikan judul asli: ${session.titleUpstream ?? ''}`}
+                  aria-label="Kembalikan judul asli"
+                  onClick={(e) => { e.stopPropagation(); void handleRestore() }}
                 >
-                  <Bot size={14} />
+                  <Undo2 size={13} />
                 </button>
               )}
+              <button
+                type="button"
+                className="cancel"
+                title="Batal (Esc)"
+                aria-label="Batal"
+                onClick={(e) => { e.stopPropagation(); closeRename() }}
+              >
+                ✕
+              </button>
             </div>
-          </div>
-
-          {/* Zona tukar tetap 30px: model+meta / run / rename / konfirmasi hapus. */}
-          <div className="fx-session-card__zone">
-            {delConfirm ? (
-              <div className="fx-session-card__confirmrow">
-                <span>Hapus sesi ini?</span>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); setDelConfirm(false) }}
-                >
-                  Batal
-                </button>
-                <button
-                  type="button"
-                  className="delete"
-                  onClick={(e) => { e.stopPropagation(); void handleDelete() }}
-                >
-                  HAPUS
-                </button>
+          ) : (
+            <>
+              <div className="fx-session-card__modelrow">
+                <MarqueeText className="fx-session-card__model" text={modelText} title={modelID} />
               </div>
-            ) : renaming ? (
-              <div className="fx-session-card__rename">
-                <input
-                  value={renameInput}
-                  maxLength={80}
-                  title={session.titleUpstream ? `judul asli: ${session.titleUpstream}` : undefined}
-                  onChange={(e) => setRenameInput(e.target.value)}
-                  autoFocus={true}
-                  onClick={(e) => e.stopPropagation()}
-                  onKeyDown={(e) => {
-                    e.stopPropagation()
-                    if (e.key === 'Escape') closeRename()
-                    if (e.key === 'Enter') void handleRename()
-                  }}
-                />
-                <button
-                  type="button"
-                  className="save"
-                  disabled={!renameInput.trim() || renameInput.trim() === (session.title ?? '')}
-                  onClick={(e) => { e.stopPropagation(); void handleRename() }}
-                >
-                  SIMPAN
-                </button>
-                {session.alias && (
-                  <button
-                    type="button"
-                    className="icon"
-                    title={`Kembalikan judul asli: ${session.titleUpstream ?? ''}`}
-                    aria-label="Kembalikan judul asli"
-                    onClick={(e) => { e.stopPropagation(); void handleRestore() }}
-                  >
-                    <Undo2 size={13} />
-                  </button>
+              <div className="fx-session-card__metarow">
+                {run ? (
+                  <div className="fx-session-card__run">
+                    Sedang bekerja
+                    <span className="fx-session-card__run-dot" aria-hidden={true} />
+                    <span className="fx-session-card__run-dot" aria-hidden={true} />
+                    <span className="fx-session-card__run-dot" aria-hidden={true} />
+                  </div>
+                ) : (
+                  <MarqueeText className="fx-session-card__meta" text={metaText} />
                 )}
-                <button
-                  type="button"
-                  className="cancel"
-                  title="Batal (Esc)"
-                  aria-label="Batal"
-                  onClick={(e) => { e.stopPropagation(); closeRename() }}
-                >
-                  ✕
-                </button>
               </div>
-            ) : (
-              <>
-                <div className="fx-session-card__modelrow">
-                  <MarqueeText className="fx-session-card__model" text={modelText} title={modelID} />
-                </div>
-                <div className="fx-session-card__metarow">
-                  {run ? (
-                    <div className="fx-session-card__run">
-                      Sedang bekerja
-                      <span className="fx-session-card__run-dot" aria-hidden={true} />
-                      <span className="fx-session-card__run-dot" aria-hidden={true} />
-                      <span className="fx-session-card__run-dot" aria-hidden={true} />
-                    </div>
-                  ) : (
-                    <MarqueeText className="fx-session-card__meta" text={metaText} />
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-
-          {visibleError && (
-            <div className="fx-session-card__error" title={visibleError}>
-              {visibleError}
-            </div>
+            </>
           )}
         </div>
+
+        {visibleError && (
+          <div className="fx-session-card__error" title={visibleError}>
+            {visibleError}
+          </div>
+        )}
       </div>
 
       {run ? (
