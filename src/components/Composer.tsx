@@ -6,6 +6,7 @@ import { useState, type FormEvent } from 'react'
 import { ArrowUp, StopCircle, Monitor, RotateCcw } from 'lucide-react'
 import { sessionStore } from '../lib/sessionStore'
 import { useSessionStore } from '../lib/useSessionStore'
+import { modelDisplayName } from '../lib/modelDisplayName'
 
 export function Composer() {
   const [text, setText] = useState('')
@@ -45,12 +46,14 @@ export function Composer() {
 
   const live = state.activeRun
   const placeholder = live ? 'Agent bekerja…' : editing ? 'Mengedit percobaan…' : 'Tulis pesan…'
+  const activeModelID = state.active?.model?.id ?? ''
+  const modelLabel = modelDisplayName(activeModelID) || modelDisplayName(state.modelLabel)
 
   return (
     <>
       <div className="fx-composer" data-ctx-high={state.contextPercent != null && state.contextPercent > 90 ? 'true' : 'false'} style={{ '--ctx': `${state.contextPercent ?? 0}%` } as React.CSSProperties}>
       <div className="flex items-start justify-between gap-2 mb-1 text-xs text-slate-500 font-mono">
-        <span className="flex items-center gap-1"><Monitor size={12} /> {state.modelLabel}</span>
+        <span className="flex items-center gap-1" title={activeModelID || undefined}><Monitor size={12} /> {modelLabel}</span>
         <span>{state.contextPercent != null ? `konteks ${state.contextPercent}%` : 'konteks —'}</span>
       </div>
       <form onSubmit={onSubmit} className="fx-composer-inner">

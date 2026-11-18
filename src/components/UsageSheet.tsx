@@ -5,6 +5,7 @@
 // tidak ada, agregat tunggal berlabel model sesi — tidak pecah secara karangan.
 import { X } from 'lucide-react'
 import { useSessionStore } from '../lib/useSessionStore'
+import { modelDisplayName } from '../lib/modelDisplayName'
 
 interface Props {
   onClose: () => void
@@ -83,7 +84,9 @@ export function UsageSheet({ onClose }: Props) {
           <span className="fx-usage-sheet__label">Rincian per model</span>
           {byModel.size === 0 ? (
             <div className="fx-usage-sheet__model">
-              <span className="fx-usage-sheet__model-name">{active?.model?.id ?? '(tidak diketahui)'}</span>
+              <span className="fx-usage-sheet__model-name" title={active?.model?.id ?? undefined}>
+                {modelDisplayName(active?.model?.id) || '(tidak diketahui)'}
+              </span>
               <div className="fx-usage-sheet__model-stat">
                 in {formatTokens(tokens?.input)} · out {formatTokens(tokens?.output)} · reasoning {formatTokens(tokens?.reasoning)}
                 {'\n'}cache read {formatTokens(tokens?.cache?.read)} · cache write {formatTokens(tokens?.cache?.write)}
@@ -92,7 +95,7 @@ export function UsageSheet({ onClose }: Props) {
           ) : (
             [...byModel.entries()].map(([modelID, s]) => (
               <div key={modelID} className="fx-usage-sheet__model">
-                <span className="fx-usage-sheet__model-name">{modelID}</span>
+                <span className="fx-usage-sheet__model-name" title={modelID}>{modelDisplayName(modelID)}</span>
                 <div className="fx-usage-sheet__model-stat">
                   in {formatTokens(s.input)} · out {formatTokens(s.output)} · reasoning {formatTokens(s.reasoning)}
                   {'\n'}cache read {formatTokens(s.cacheRead)} · cache write {formatTokens(s.cacheWrite)}

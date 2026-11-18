@@ -1157,19 +1157,21 @@
 }
 
 /* 7.3 Kartu sesi — .fx-session-card [data-state: active|run|idle]
-   N4.4.5 — kartu SOLID: satu tinggi (--fx-card-h) untuk semua isi/keadaan.
-   Kerangka tetap: node 28px + kolom isi 3 baris (judul 20px, model 15px,
-   meta 15px). Zona model+meta 30px bertukar tanpa mengubah tinggi kartu;
-   hairline/sweep absolut di tepi bawah. Akar <div role="button">. */
+   N4.4.6 — kartu SOLID: tinggi dikunci height+min-height+max-height dan
+   flex:none. Anggaran border-box: padding 7+7, judul 24, model 15, meta 15
+   = 68px. Cincin status memakai inset box-shadow agar tidak memakan tinggi. */
 :root { --fx-card-h: 68px; }
 .fx-session-card {
   display: flex;
   flex-direction: column;
   margin: 10px 12px;
-  padding: 8px 12px;
+  padding: 7px 12px;
   height: var(--fx-card-h);
+  min-height: var(--fx-card-h);
+  max-height: var(--fx-card-h);
+  flex: none;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.02);
   cursor: pointer;
   position: relative;
@@ -1178,27 +1180,34 @@
   min-width: 0;
 }
 .fx-session-card[data-state="active"] {
-  border-color: rgba(56, 189, 248, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.55);
   background: linear-gradient(180deg, rgba(14, 42, 67, 0.85), rgba(10, 26, 43, 0.9));
 }
 .fx-session-card[data-state="run"] {
-  border-color: rgba(251, 191, 36, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.55);
   background: rgba(251, 191, 36, 0.06);
 }
 .fx-session-card[data-state="idle"] {
-  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.02);
 }
 .fx-session-card__top {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  height: 100%;
+  height: calc(var(--fx-card-h) - 14px);
+  min-height: calc(var(--fx-card-h) - 14px);
+  max-height: calc(var(--fx-card-h) - 14px);
+  flex: none;
+  overflow: hidden;
   min-width: 0;
 }
 .fx-session-card__content {
   flex: 1 1 auto;
   min-width: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -1209,8 +1218,12 @@
   gap: 6px;
   flex-wrap: nowrap;
   min-width: 0;
-  height: 20px;
-  line-height: 20px;
+  height: 24px;
+  min-height: 24px;
+  max-height: 24px;
+  flex: none;
+  overflow: hidden;
+  line-height: 24px;
 }
 /* Node 28px (ramping N4.4.5) — aktif: cincin cyan + titik menyala; run:
    cincin amber dengan busur berputar (fx-spin-card 0,9s); idle: redup. */
@@ -1260,8 +1273,10 @@
 .fx-session-card__title {
   flex: 1 1 auto;
   min-width: 0;
-  height: 20px;
-  line-height: 20px;
+  height: 24px;
+  min-height: 24px;
+  max-height: 24px;
+  line-height: 24px;
   font-weight: 700;
   color: var(--fx-text);
   font-size: 15px;
@@ -1301,9 +1316,13 @@
   text-overflow: ellipsis;
 }
 /* Zona tukar 30px: model+meta (15+15), run, konsol rename, konfirmasi hapus.
-   Semua varian berketinggian SAMA; tidak ada yang menambah tinggi kartu. */
+   Semua varian berketinggian SAMA dan dikunci min/max; tidak ada yang
+   menambah tinggi kartu. */
 .fx-session-card__zone {
   height: 30px;
+  min-height: 30px;
+  max-height: 30px;
+  flex: none;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -1312,6 +1331,9 @@
 .fx-session-card__modelrow,
 .fx-session-card__metarow {
   height: 15px;
+  min-height: 15px;
+  max-height: 15px;
+  flex: none;
   line-height: 15px;
   display: flex;
   align-items: center;
@@ -1324,6 +1346,8 @@
   flex: 1 1 auto;
   min-width: 0;
   height: 15px;
+  min-height: 15px;
+  max-height: 15px;
   line-height: 15px;
   white-space: nowrap;
   overflow: hidden;
@@ -1345,14 +1369,15 @@
 }
 .fx-marquee--active .fx-marquee__inner {
   animation-name: fx-marquee;
-  animation-duration: 3s;
+  animation-duration: 11s;
   animation-timing-function: ease-in-out;
   animation-iteration-count: infinite;
-  animation-direction: alternate;
 }
 @keyframes fx-marquee {
-  0%, 15% { transform: translateX(0); }
-  85%, 100% { transform: translateX(var(--fx-shift)); }
+  0%, 45% { transform: translateX(0); }
+  60%, 80% { transform: translateX(var(--fx-shift)); }
+  88% { transform: translateX(var(--fx-shift)); }
+  100% { transform: translateX(0); }
 }
 @media (prefers-reduced-motion: reduce) {
   .fx-marquee--active .fx-marquee__inner {
@@ -1390,8 +1415,12 @@
   align-items: center;
   gap: 6px;
   height: 30px;
+  min-height: 30px;
+  max-height: 30px;
+  flex: none;
   margin-top: 0;
   min-width: 0;
+  overflow: hidden;
 }
 .fx-session-card__rename input {
   flex: 1 1 auto;
@@ -1445,7 +1474,11 @@
   align-items: center;
   gap: 6px;
   height: 30px;
+  min-height: 30px;
+  max-height: 30px;
+  flex: none;
   min-width: 0;
+  overflow: hidden;
 }
 .fx-session-card__confirmrow span {
   flex: 1 1 auto;
@@ -1487,8 +1520,8 @@
 }
 .fx-session-card__actions button {
   flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(0, 0, 0, 0.28);
@@ -1536,10 +1569,15 @@
   align-items: center;
   gap: 6px;
   height: 15px;
+  min-height: 15px;
+  max-height: 15px;
+  flex: 1 1 auto;
   line-height: 15px;
   font-size: 12px;
   font-family: ui-monospace, Menlo, monospace;
   color: var(--fx-amber);
+  min-width: 0;
+  overflow: hidden;
 }
 .fx-session-card__run-dot {
   width: 6px;
@@ -2101,11 +2139,6 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.fx-newsession__model-provider {
-  flex-shrink: 0;
-  font-size: 11px;
-  color: var(--fx-muted);
 }
 .fx-newsession__models-empty {
   display: block;

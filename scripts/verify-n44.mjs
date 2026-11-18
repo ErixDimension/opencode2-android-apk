@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // scripts/verify-n44.mjs — harness verifikasi N4.4 (panel sesi + usage + permission).
 // Boot instance adapter scratch (state + port di luar repo), sajikan dist hasil
-// build, jalankan H0-H13. Tidak pernah mencetak password/token/rahasia.
+// build, jalankan H0-H20. Tidak pernah mencetak password/token/rahasia.
 import http from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -644,7 +644,7 @@ async function main() {
     )
 
     // ---- H18c (source/CSS): kartu video — rounded 14px, node 28px
-    //      (N4.4.5 merampingkan dari 34px), border per data-state sesuai §2 ----
+    //      (N4.4.5 merampingkan dari 34px), cincin status per data-state ----
     const h18cBase = (cssSrc4.match(/\.fx-session-card\s*\{[^}]*\}/) ?? [''])[0]
     const h18cNode = (cssSrc4.match(/\.fx-session-card__node\s*\{[^}]*\}/) ?? [''])[0]
     const stateBlock = (name) =>
@@ -657,7 +657,7 @@ async function main() {
     const h18cRun = /rgba\(251,\s*191,\s*36,\s*0?\.55\)/.test(stateBlock('run'))
     const h18cIdle = /rgba\(255,\s*255,\s*255,\s*0?\.08\)/.test(stateBlock('idle'))
     assert(
-      'H18c kartu video: border-radius 14px (±2), node 28px (ramping N4.4.5), border per data-state (aktif cyan+gradasi, run amber, idle redup)',
+      'H18c kartu video: border-radius 14px (±2), node 28px (ramping N4.4.5), cincin status per data-state (aktif cyan+gradasi, run amber, idle redup)',
       h18cRadius && h18cNode28 && h18cActive && h18cRun && h18cIdle,
       `radius=${h18cRadius} node28=${h18cNode28} active=${h18cActive} run=${h18cRun} idle=${h18cIdle}`
     )
@@ -691,7 +691,7 @@ async function main() {
     )
 
     // ---- H19c: baris model SELALU dirender (tanpa kondisional yang menghilangkannya) ----
-    const h19ModelRow = /<MarqueeText\s+className="fx-session-card__model"\s+text=\{modelText\}\s*\/>/.test(cardSrc5)
+    const h19ModelRow = /<MarqueeText\b[^>]*className="fx-session-card__model"[^>]*text=\{modelText\}/.test(cardSrc5)
     const h19NoConditionalModelRow =
       !/session\.model\?\.id\s*&&\s*<[^>]*fx-session-card__model/.test(cardSrc5) &&
       !/session\.model\s*&&\s*<[^>]*fx-session-card__model/.test(cardSrc5)
@@ -701,12 +701,83 @@ async function main() {
       `modelRow=${h19ModelRow} unconditional=${h19NoConditionalModelRow}`
     )
 
+    // ================= N4.4.6: H20 =================
+
+    const cardSrc6 = readFileRel('src/components/SessionCard.tsx')
+    const cssSrc6 = readFileRel('src/styles/spine-flux.css')
+    const dialogSrc6 = readFileRel('src/components/NewSessionDialog.tsx')
+    const barSrc6 = readFileRel('src/components/SessionBar.tsx')
+    const composerSrc6 = readFileRel('src/components/Composer.tsx')
+    const helperSrc6 = readFileRel('src/lib/modelDisplayName.ts')
+
+    // ---- H20a: tinggi kartu dikunci tiga lapis + baris model/meta ----
+    const h20Card = (cssSrc6.match(/\.fx-session-card\s*\{[^}]*\}/) ?? [''])[0]
+    const h20CardLock =
+      /min-height:\s*var\(--fx-card-h\)/.test(h20Card) &&
+      /max-height:\s*var\(--fx-card-h\)/.test(h20Card) &&
+      /flex:\s*none/.test(h20Card)
+    const h20Rows =
+      (cssSrc6.match(/\.fx-session-card__modelrow,\s*\.fx-session-card__metarow\s*\{[^}]*\}/) ?? [''])[0]
+    const h20RowsLocked =
+      /height:\s*15px/.test(h20Rows) &&
+      /min-height:\s*15px/.test(h20Rows) &&
+      /max-height:\s*15px/.test(h20Rows)
+    assert(
+      'H20a .fx-session-card min-height & max-height = var(--fx-card-h) + flex:none; pembungkus baris model/meta dikunci 15px',
+      h20CardLock && h20RowsLocked,
+      `cardLock=${h20CardLock} rowsLocked=${h20RowsLocked}`
+    )
+
+    // ---- H20b: marquee v2 — siklus 11s bersama, delay negatif sinkron,
+    //      mayoritas siklus diam di translateX(0) ----
+    const h20Cycle = /animation-duration:\s*11s/.test(cssSrc6) && /MARQUEE_CYCLE_MS\s*=\s*11_000/.test(cardSrc6)
+    const h20NoDistanceDuration = !/overflow\s*\/\s*30/.test(cardSrc6) && !/setDuration/.test(cardSrc6)
+    const h20SyncDelay =
+      /animationDelay:\s*`\$\{syncDelay\}ms`/.test(cardSrc6) &&
+      /performance\.now\(\)/.test(cardSrc6) &&
+      /now\s*%\s*MARQUEE_CYCLE_MS/.test(cardSrc6) &&
+      /delayRef\.current\s*=\s*-Math\.round/.test(cardSrc6)
+    const h20Quiet =
+      /@keyframes\s+fx-marquee\s*\{[\s\S]*?0%,\s*45%\s*\{\s*transform:\s*translateX\(0\)/.test(cssSrc6) &&
+      /translateX\(var\(--fx-shift\)\)/.test(cssSrc6)
+    assert(
+      'H20b marquee v2: durasi 11s konstan (bukan jarak/30), animation-delay negatif dari jam bersama, 0%-45% diam di translateX(0)',
+      h20Cycle && h20NoDistanceDuration && h20SyncDelay && h20Quiet,
+      `cycle=${h20Cycle} noDistance=${h20NoDistanceDuration} syncDelay=${h20SyncDelay} quiet=${h20Quiet}`
+    )
+
+    // ---- H20c: modelDisplayName dipakai kartu/dialog/session bar; label
+    //      provider terpisah tidak dirender di baris model dialog ----
+    const h20Helper =
+      helperSrc6.includes('export function modelDisplayName') &&
+      helperSrc6.includes("lastIndexOf('/')")
+    const h20CardName =
+      cardSrc6.includes("from '../lib/modelDisplayName'") &&
+      /modelDisplayName\(modelID\)/.test(cardSrc6) &&
+      /const modelID = session\.model\?\.id/.test(cardSrc6)
+    const h20DialogName =
+      dialogSrc6.includes("from '../lib/modelDisplayName'") &&
+      /modelDisplayName\(m\.id\)/.test(dialogSrc6) &&
+      !dialogSrc6.includes('fx-newsession__model-provider') &&
+      !/\{m\.providerID\}/.test(dialogSrc6)
+    const h20BarName =
+      barSrc6.includes("from '../lib/modelDisplayName'") &&
+      /modelDisplayName\(active\.model\.id\)/.test(barSrc6)
+    const h20ComposerName =
+      composerSrc6.includes("from '../lib/modelDisplayName'") &&
+      /modelDisplayName\(activeModelID\)/.test(composerSrc6)
+    assert(
+      'H20c modelDisplayName ada + dipakai kartu/dialog/session bar/composer; label provider terpisah tidak dirender di dialog',
+      h20Helper && h20CardName && h20DialogName && h20BarName && h20ComposerName,
+      `helper=${h20Helper} card=${h20CardName} dialog=${h20DialogName} bar=${h20BarName} composer=${h20ComposerName}`
+    )
+
   } finally {
     adapter.kill()
     cleanup()
   }
 
-  log(`HASIL: ${failures === 0 ? 'SEMUA PASS (H0-H19)' : failures + ' ASSERTION GAGAL'}`)
+  log(`HASIL: ${failures === 0 ? 'SEMUA PASS (H0-H20)' : failures + ' ASSERTION GAGAL'}`)
   process.exit(failures === 0 ? 0 : 1)
 }
 

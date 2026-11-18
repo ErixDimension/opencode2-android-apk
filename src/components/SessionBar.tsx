@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { eventStream } from '../lib/eventStream'
 import { useSessionStore } from '../lib/useSessionStore'
+import { modelDisplayName } from '../lib/modelDisplayName'
 
 interface Props {
   open: boolean
@@ -43,7 +44,7 @@ export function SessionBar({ open, onToggle }: Props) {
             </span>
             {active.model?.id && (
               <span className="fx-sessionbar__model" title={active.model.id}>
-                · {active.model.id}
+                · {modelDisplayName(active.model.id)}
               </span>
             )}
           </>

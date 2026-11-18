@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react'
 import { sessionStore } from '../lib/sessionStore'
 import { useSessionStore } from '../lib/useSessionStore'
 import { getModelList } from '../lib/apiClient'
+import { modelDisplayName } from '../lib/modelDisplayName'
 import { X, Play } from 'lucide-react'
 
 interface Props {
@@ -120,8 +121,9 @@ export function NewSessionDialog({ onClose }: Props) {
                   checked={selected === m.id}
                   onChange={() => setSelected(m.id)}
                 />
-                <span className="fx-newsession__model-id">{m.id}</span>
-                <span className="fx-newsession__model-provider">{m.providerID}</span>
+                <span className="fx-newsession__model-id" title={m.id}>
+                  {modelDisplayName(m.id)}
+                </span>
               </label>
             ))}
             {models.length === 0 && (

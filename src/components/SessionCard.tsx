@@ -1,10 +1,9 @@
-// SessionCard.tsx — §1/§2 N4.4.5: kartu SOLID. Tinggi SELALU
-// var(--fx-card-h) (68px), apa pun isinya: idle/aktif/run, konsol rename,
-// maupun konfirmasi hapus. Kerangka tetap: node 28px + kolom isi tiga baris
-// (judul 20px, model 15px, meta 15px). Baris model SELALU dirender walau
-// kosong. Judul/model/meta memakai MarqueeText: teks yang muat diam, teks
-// berlebih berjalan kiri-jeda-kanan (bukan ellipsis diam-diam).
-// Akar <div role="button">; tombol aksi selalu di baris judul, tidak wrap.
+// SessionCard.tsx — §1/§2/§3 N4.4.6: kartu SOLID. Tinggi SELALU
+// var(--fx-card-h) (68px) dan dikunci min/max/flex, apa pun isinya. Kerangka:
+// node 28px + judul 24px + model 15px + meta 15px. Baris model SELALU ada.
+// Judul/model/meta memakai MarqueeText v2: satu siklus 11 detik dengan fase
+// negatif dari jam bersama, sehingga semua teks bergerak/berhenti seirama.
+// Nama model memakai modelDisplayName (tanpa prefix provider); id penuh di title.
 import {
   useState,
   useCallback,
@@ -15,6 +14,7 @@ import {
 } from 'react'
 import { Edit2, Trash2, Bot, BarChart3, Undo2 } from 'lucide-react'
 import { sessionStore, type SessionView } from '../lib/sessionStore'
+import { modelDisplayName } from '../lib/modelDisplayName'
 
 interface Props {
   session: SessionView
@@ -30,10 +30,13 @@ interface Props {
 }
 
 /*──────────────────────────────────────────────────────────────────────
-  MarqueeText — teks berjalan hanya bila lebar teks > lebar wadah.
-  --fx-shift = -(lebar teks - lebar wadah), dari pengukuran nyata.
-  Durasi sebanding jarak (±30px/detik), minimum 3 detik.
+  MarqueeText v2 — teks berjalan hanya bila lebar teks > lebar wadah.
+  Semua instance memakai siklus 11 detik yang sama. Fase awal negatif
+  dihitung dari performance.now() (jam bersama), sehingga teks bergerak
+  dan berhenti pada saat yang sama. --fx-shift = -(teks - wadah).
 ──────────────────────────────────────────────────────────────────────*/
+const MARQUEE_CYCLE_MS = 11_000
+
 function MarqueeText({
   text,
   className,
@@ -45,8 +48,9 @@ function MarqueeText({
 }) {
   const boxRef = useRef<HTMLSpanElement | null>(null)
   const innerRef = useRef<HTMLSpanElement | null>(null)
+  const delayRef = useRef<number | null>(null)
   const [shift, setShift] = useState(0)
-  const [duration, setDuration] = useState(3)
+  const [syncDelay, setSyncDelay] = useState(0)
 
   useLayoutEffect(() => {
     const box = boxRef.current
@@ -58,11 +62,16 @@ function MarqueeText({
       const full = inner.scrollWidth
       const overflow = full - available
       if (available > 0 && overflow > 1) {
+        if (delayRef.current == null) {
+          const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+          delayRef.current = -Math.round(now % MARQUEE_CYCLE_MS)
+          setSyncDelay(delayRef.current)
+        }
         setShift(-overflow)
-        setDuration(Math.max(3, overflow / 30))
       } else {
+        delayRef.current = null
+        setSyncDelay(0)
         setShift(0)
-        setDuration(3)
       }
     }
 
@@ -76,7 +85,10 @@ function MarqueeText({
 
   const style: CSSProperties | undefined =
     shift < 0
-      ? ({ '--fx-shift': `${shift}px`, animationDuration: `${duration}s` } as CSSProperties)
+      ? ({
+          '--fx-shift': `${shift}px`,
+          animationDelay: `${syncDelay}ms`,
+        } as CSSProperties)
       : undefined
 
   return (
@@ -204,8 +216,9 @@ export function SessionCard({
 
   const statusChip = run ? 'run' : isActive ? 'active' : 'idle'
   const directory = session.location?.directory ?? ''
+  const modelID = session.model?.id ?? ''
   // Baris model SELALU ada; tanpa model cukup teks kosong setinggi baris.
-  const modelText = session.model?.id ?? ''
+  const modelText = modelDisplayName(modelID)
 
   const metaParts: string[] = []
   const rel = relativeTime(session.updatedAt)
@@ -263,7 +276,7 @@ export function SessionCard({
                   setModelError(null)
                 }}
               >
-                <Edit2 size={13} />
+                <Edit2 size={14} />
               </button>
               {isActive && (
                 <button
@@ -271,7 +284,7 @@ export function SessionCard({
                   title="Buka statistik sesi"
                   onClick={(e) => { e.stopPropagation(); sessionStore.openUsageSheet() }}
                 >
-                  <BarChart3 size={13} />
+                  <BarChart3 size={14} />
                 </button>
               )}
               <button
@@ -286,7 +299,7 @@ export function SessionCard({
                   setModelError(null)
                 }}
               >
-                <Trash2 size={13} />
+                <Trash2 size={14} />
               </button>
               {session.model?.id && (
                 <button
@@ -297,7 +310,7 @@ export function SessionCard({
                     setModelError('Ganti model tidak didukung oleh server (PATCH /api/session/:id → 404)')
                   }}
                 >
-                  <Bot size={13} />
+                  <Bot size={14} />
                 </button>
               )}
             </div>
@@ -369,7 +382,7 @@ export function SessionCard({
             ) : (
               <>
                 <div className="fx-session-card__modelrow">
-                  <MarqueeText className="fx-session-card__model" text={modelText} />
+                  <MarqueeText className="fx-session-card__model" text={modelText} title={modelID} />
                 </div>
                 <div className="fx-session-card__metarow">
                   {run ? (
