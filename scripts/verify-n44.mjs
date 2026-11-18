@@ -133,7 +133,7 @@ async function main() {
   fs.rmSync(SCRATCH_STATE, { recursive: true, force: true })
   fs.mkdirSync(SCRATCH_STATE, { recursive: true })
   const adapterLog = []
-  const adapter = spawn('node', ['server.mjs'], {
+  let adapter = spawn('node', ['server.mjs'], {
     cwd: REPO,
     env: { ...process.env, FLUX_PORT: String(SCRATCH_PORT), FLUX_STATE_DIR: SCRATCH_STATE },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -424,14 +424,18 @@ async function main() {
 
     // ================= N4.4.1: H14-H15 =================
 
-    // ---- H14: renameSession memeriksa status updateSession (bukan ok:true
-    //          sepihak) + UsageSheet width string persen ----
+    // ---- H14: renameSession memeriksa status setSessionAlias (bukan
+    //          ok:true sepihak; PATCH upstream tidak dipakai lagi) +
+    //          UsageSheet width string persen ----
     const storeSrc = readFileRel('src/lib/sessionStore.ts')
-    const h14RenameStatus = storeSrc.includes('if (!res.ok)') && storeSrc.includes('Gagal mengganti judul (server ${res.status})')
+    const h14RenameStatus =
+      storeSrc.includes('setSessionAlias') &&
+      storeSrc.includes('if (!res.ok)') &&
+      storeSrc.includes('Gagal menyimpan alias (server ${res.status})')
     const usageSrc2 = readFileRel('src/components/UsageSheet.tsx')
     const h14UsagePct = usageSrc2.includes('${pct}%')
     assert(
-      'H14 renameSession memeriksa status hasil updateSession (tidak ok:true tanpa syarat)',
+      'H14 renameSession memeriksa status hasil setSessionAlias (tidak ok:true tanpa syarat)',
       h14RenameStatus,
       `renameStatus=${h14RenameStatus}`
     )
@@ -532,12 +536,138 @@ async function main() {
       `ownClass=${h17cOwnClass} box=${h17cBox}`
     )
 
+    // ================= N4.4.4: H18 =================
+
+    const listSrc4 = readFileRel('src/components/SessionList.tsx')
+    const cardSrc4 = readFileRel('src/components/SessionCard.tsx')
+    const cssSrc4 = readFileRel('src/styles/spine-flux.css')
+
+    // ---- H18a (live): round-trip alias lokal + auth + validasi + persistensi
+    //      sesudah adapter scratch di-restart dengan state dir yang sama ----
+    const aliasSessionID = newId
+    const aliasTitle = 'Alias Verifikasi N4.4.4'
+    const persistTitle = 'Alias Persist N4.4.4'
+    let h18Put = { status: 0 }
+    let h18GetOk = false
+    let h18Naked = { status: 0 }
+    let h18Empty = { status: 0 }
+    let h18Delete = { status: 0 }
+    let h18Gone = false
+    let h18Persist = false
+    let h18RestartOk = false
+
+    if (aliasSessionID) {
+      const aliasPath = `/api/session-alias/${encodeURIComponent(aliasSessionID)}`
+      h18Put = await httpRequest({
+        hostname: SCRATCH_HOST, port: SCRATCH_PORT, path: aliasPath, method: 'PUT', cookie,
+        body: JSON.stringify({ title: `  ${aliasTitle}  ` }),
+        headers: { 'content-type': 'application/json' },
+      })
+      const get1 = await httpRequest({ hostname: SCRATCH_HOST, port: SCRATCH_PORT, path: '/api/session-alias', cookie })
+      const get1J = jsonSafe(get1.body)
+      h18GetOk = get1.status === 200 && get1J?.aliases?.[aliasSessionID] === aliasTitle
+
+      h18Naked = await httpRequest({ hostname: SCRATCH_HOST, port: SCRATCH_PORT, path: '/api/session-alias' })
+      h18Empty = await httpRequest({
+        hostname: SCRATCH_HOST, port: SCRATCH_PORT, path: aliasPath, method: 'PUT', cookie,
+        body: JSON.stringify({ title: '   ' }),
+        headers: { 'content-type': 'application/json' },
+      })
+      h18Delete = await httpRequest({
+        hostname: SCRATCH_HOST, port: SCRATCH_PORT, path: aliasPath, method: 'DELETE', cookie,
+      })
+      const get2 = await httpRequest({ hostname: SCRATCH_HOST, port: SCRATCH_PORT, path: '/api/session-alias', cookie })
+      const get2J = jsonSafe(get2.body)
+      h18Gone = get2.status === 200 && !Object.prototype.hasOwnProperty.call(get2J?.aliases ?? {}, aliasSessionID)
+
+      // Persistensi: PUT lagi, restart adapter dengan FLUX_STATE_DIR yang sama,
+      // login ulang (sesi auth in-memory hilang saat restart), lalu GET.
+      const put2 = await httpRequest({
+        hostname: SCRATCH_HOST, port: SCRATCH_PORT, path: aliasPath, method: 'PUT', cookie,
+        body: JSON.stringify({ title: persistTitle }),
+        headers: { 'content-type': 'application/json' },
+      })
+      if (put2.status === 200) {
+        await new Promise((resolve) => {
+          adapter.once('close', resolve)
+          adapter.kill('SIGTERM')
+          setTimeout(resolve, 3000)
+        })
+        await new Promise((r) => setTimeout(r, 400))
+        adapter = spawn('node', ['server.mjs'], {
+          cwd: REPO,
+          env: { ...process.env, FLUX_PORT: String(SCRATCH_PORT), FLUX_STATE_DIR: SCRATCH_STATE },
+          stdio: ['ignore', 'pipe', 'pipe'],
+        })
+        adapter.stdout.on('data', (c) => adapterLog.push(c.toString()))
+        adapter.stderr.on('data', (c) => adapterLog.push(c.toString()))
+        h18RestartOk = await waitForHealthz()
+        if (h18RestartOk) {
+          const login2 = await httpRequest({
+            hostname: SCRATCH_HOST, port: SCRATCH_PORT, path: '/login', method: 'POST',
+            body: JSON.stringify({ password: SCRATCH_PASSWORD }),
+            headers: { 'content-type': 'application/json' },
+          })
+          const freshCookie = extractCookie(login2.headers['set-cookie'])
+          if (freshCookie) cookie = freshCookie
+          const get3 = await httpRequest({ hostname: SCRATCH_HOST, port: SCRATCH_PORT, path: '/api/session-alias', cookie })
+          const get3J = jsonSafe(get3.body)
+          h18Persist = get3.status === 200 && get3J?.aliases?.[aliasSessionID] === persistTitle
+          await httpRequest({ hostname: SCRATCH_HOST, port: SCRATCH_PORT, path: aliasPath, method: 'DELETE', cookie })
+        }
+      }
+    }
+
+    assert(
+      'H18a round-trip alias lokal: PUT 200, GET memuat, DELETE 204 lalu kosong; tanpa cookie 401; judul kosong 400; alias bertahan sesudah restart adapter',
+      h18Put.status === 200 && h18GetOk && h18Naked.status === 401 && h18Empty.status === 400 &&
+        h18Delete.status === 204 && h18Gone && h18RestartOk && h18Persist,
+      `put=${h18Put.status} get=${h18GetOk} naked=${h18Naked.status} empty=${h18Empty.status} delete=${h18Delete.status} gone=${h18Gone} restart=${h18RestartOk} persist=${h18Persist}`
+    )
+
+    // ---- H18b (source): search judul efektif + ikon Shield menggantikan
+    //      tombol teks "Izin tersimpan", tetap membuka PermissionSavedList ----
+    const h18bSearch =
+      listSrc4.includes('fx-session-list__search') &&
+      listSrc4.includes('Cari nama sesi') &&
+      listSrc4.includes('toLowerCase()') &&
+      listSrc4.includes('.title')
+    const h18bShield =
+      listSrc4.includes('Shield') &&
+      !listSrc4.includes('ShieldCheck') &&
+      !/>\s*Izin tersimpan\s*</.test(listSrc4)
+    const h18bSaved = listSrc4.includes('getPermissionSaved') && listSrc4.includes('PermissionSavedList')
+    assert(
+      'H18b SessionList: input search memfilter judul efektif; tombol teks "Izin tersimpan" diganti ikon Shield yang tetap membuka PermissionSavedList',
+      h18bSearch && h18bShield && h18bSaved,
+      `search=${h18bSearch} shield=${h18bShield} saved=${h18bSaved}`
+    )
+
+    // ---- H18c (source/CSS): kartu video — rounded 14px, node 34px,
+    //      border per data-state sesuai §2 ----
+    const h18cBase = (cssSrc4.match(/\.fx-session-card\s*\{[^}]*\}/) ?? [''])[0]
+    const h18cNode = (cssSrc4.match(/\.fx-session-card__node\s*\{[^}]*\}/) ?? [''])[0]
+    const stateBlock = (name) =>
+      (cssSrc4.match(new RegExp(`\\.fx-session-card\\[data-state="${name}"\\]\\s*\\{[^}]*\\}`)) ?? [''])[0]
+    const h18cRadius = /border-radius:\s*1[2-6]px/.test(h18cBase)
+    const h18cNode34 = /width:\s*34px/.test(h18cNode) && /height:\s*34px/.test(h18cNode)
+    const h18cActive =
+      /rgba\(56,\s*189,\s*248,\s*0?\.55\)/.test(stateBlock('active')) &&
+      /linear-gradient/.test(stateBlock('active'))
+    const h18cRun = /rgba\(251,\s*191,\s*36,\s*0?\.55\)/.test(stateBlock('run'))
+    const h18cIdle = /rgba\(255,\s*255,\s*255,\s*0?\.08\)/.test(stateBlock('idle'))
+    assert(
+      'H18c kartu video: border-radius 14px (±2), node 34px, border per data-state (aktif cyan+gradasi, run amber, idle redup)',
+      h18cRadius && h18cNode34 && h18cActive && h18cRun && h18cIdle,
+      `radius=${h18cRadius} node34=${h18cNode34} active=${h18cActive} run=${h18cRun} idle=${h18cIdle}`
+    )
+
   } finally {
     adapter.kill()
     cleanup()
   }
 
-  log(`HASIL: ${failures === 0 ? 'SEMUA PASS (H0-H17)' : failures + ' ASSERTION GAGAL'}`)
+  log(`HASIL: ${failures === 0 ? 'SEMUA PASS (H0-H18)' : failures + ' ASSERTION GAGAL'}`)
   process.exit(failures === 0 ? 0 : 1)
 }
 

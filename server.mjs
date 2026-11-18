@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url'
 
 import * as auth from './server/auth.mjs'
 import * as credentials from './server/credentials.mjs'
+import * as sessionAliases from './server/session-aliases.mjs'
 import { checkUpstream } from './server/registry.mjs'
 import { proxyRequest } from './server/proxy.mjs'
 import { evaluateFsPolicy } from './server/fs-policy.mjs'
@@ -326,6 +327,44 @@ const server = http.createServer(async (req, res) => {
     }
     if (session.renew) {
       res.setHeader('Set-Cookie', auth.cookieFor(token))
+    }
+
+    // Alias judul sesi milik flux-webui sendiri (N4.4.4). Dicek sebelum
+    // proxy supaya tidak pernah diteruskan ke upstream. Judul upstream/
+    // CLI tidak berubah; ini murni tampilan lokal.
+    if (pathname === '/api/session-alias') {
+      if (method !== 'GET') {
+        sendText(res, 405, 'Method Not Allowed', { Allow: 'GET' })
+        return
+      }
+      sendJson(res, 200, { aliases: sessionAliases.readAliases() })
+      return
+    }
+
+    if (pathname.startsWith('/api/session-alias/')) {
+      const sessionID = pathname.slice('/api/session-alias/'.length)
+      if (!sessionAliases.isValidSessionID(sessionID)) {
+        sendJson(res, 400, { error: 'INVALID_SESSION_ID' })
+        return
+      }
+      if (method === 'PUT') {
+        const body = await readJson(req, res)
+        if (!body) return
+        if (!sessionAliases.setAlias(sessionID, body.title)) {
+          sendJson(res, 400, { error: 'INVALID_TITLE' })
+          return
+        }
+        sendJson(res, 200, { ok: true })
+        return
+      }
+      if (method === 'DELETE') {
+        sessionAliases.deleteAlias(sessionID)
+        res.writeHead(204, securityHeaders())
+        res.end()
+        return
+      }
+      sendText(res, 405, 'Method Not Allowed', { Allow: 'PUT, DELETE' })
+      return
     }
 
     if (pathname === '/api/event') {

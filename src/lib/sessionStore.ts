@@ -11,7 +11,9 @@ import {
   revertStage,
   revertClear,
   revertCommit,
-  updateSession,
+  getSessionAliases,
+  setSessionAlias,
+  deleteSessionAlias,
   type Message,
 } from './apiClient'
 import { mapMessages, type FluxBlock, contextPercent } from './blockMapper'
@@ -19,7 +21,11 @@ import { DEBOUNCE_ACTIVE_MS, DEBOUNCE_IDLE_MS, PAGE_SIZE } from './apiClient'
 
 export interface SessionView {
   id: string
+  // §3 N4.4.4 — `title` = judul EFEKTIF (alias ?? judul upstream). `titleUpstream`
+  // menyimpan judul asli untuk baris "judul asli: … · Kembalikan" di konsol rename.
   title?: string
+  titleUpstream?: string
+  alias?: string | null
   location?: { directory: string }
   model?: { id: string; providerID: string }
   tokens?: { input: number; output: number; reasoning: number; cache: { read: number; write: number } }
@@ -28,6 +34,7 @@ export interface SessionView {
 
 export interface StoreState {
   sessions: SessionView[]
+  aliases: Record<string, string>
   active: SessionView | null
   blocks: FluxBlock[]
   messages: Message[]
@@ -49,6 +56,7 @@ type Listener = (state: StoreState) => void
 
 const initialState: StoreState = {
   sessions: [],
+  aliases: {},
   active: null,
   blocks: [],
   messages: [],
@@ -174,15 +182,24 @@ export class SessionStore {
   async loadSessions(): Promise<void> {
     try {
       const sessions = await listSessions(50)
+      // §3 N4.4.4 — alias untuk sesi yang sudah tidak ada di daftar upstream
+      // diabaikan (dibersihkan di klien; tidak perlu endpoint khusus).
+      const knownIDs = new Set(sessions.map((s) => s.id))
+      const aliases = Object.fromEntries(
+        Object.entries(this.#state.aliases).filter(([id]) => knownIDs.has(id))
+      )
       this.#set({
         sessions: sessions.map((s) => ({
           id: s.id,
-          title: s.title,
+          title: aliases[s.id] ?? s.title,
+          titleUpstream: s.title,
+          alias: aliases[s.id] ?? null,
           location: s.location,
           model: s.model,
           tokens: s.tokens,
           updatedAt: s.time?.updated,
         })),
+        aliases,
         sessionsError: null,
       })
     } catch (err) {
@@ -194,10 +211,25 @@ export class SessionStore {
   }
 
   /*────────────────────────────────────────────────────────────────────
-    Bootstrap berurutan: muat daftar, baru pilih sesi aktif pertama.
+    Alias judul lokal (N4.4.4) — dimuat sekali saat bootstrap; judul
+    efektif = alias ?? judul upstream, dipakai di semua tempat tampilan.
+    ────────────────────────────────────────────────────────────────────*/
+  async #loadAliases(): Promise<void> {
+    try {
+      this.#set({ aliases: await getSessionAliases() })
+    } catch {
+      // Alias gagal dimuat bukan alasan menggagalkan bootstrap: tampil
+      // judul upstream (jujur), bukan judul karangan.
+      this.#set({ aliases: {} })
+    }
+  }
+
+  /*────────────────────────────────────────────────────────────────────
+    Bootstrap berurutan: muat alias + daftar, baru pilih sesi aktif pertama.
     Dipakai saat masuk Shell dan setelah login sukses di Gate.
     ────────────────────────────────────────────────────────────────────*/
   async bootstrap(): Promise<void> {
+    await this.#loadAliases()
     await this.loadSessions()
     await this.loadFirstActive()
   }
@@ -416,20 +448,50 @@ export class SessionStore {
   }
 
   /*────────────────────────────────────────────────────────────────────
-    Ganti judul (§7.5): PATCH /api/session/:id → 404 upstream (dibuktikan),
-    degradasi jujur: gagal dicatat, tidak berpura-pura tersimpan.
+    Ganti judul (§3 N4.4.4): alias lokal via PUT /api/session-alias/:id.
+    PATCH upstream TIDAK dicoba lagi (terbukti 404). Sukses → judul efektif
+    langsung berubah tanpa refetch; gagal → chip error jujur.
   ─────────────────────────────────────────────────────────────────────*/
   async renameSession(id: string, title: string): Promise<{ ok: boolean; error?: string }> {
     try {
-      const res = await updateSession(id, { title })
+      const res = await setSessionAlias(id, title)
       if (!res.ok) {
-        // §7.5 — PATCH /api/session/:id → 404 upstream: degradasi jujur,
-        // jangan berpura-pura tersimpan. Chip error di SessionCard tampil.
-        return { ok: false, error: `Gagal mengganti judul (server ${res.status}).` }
+        return { ok: false, error: `Gagal menyimpan alias (server ${res.status}).` }
       }
+      const clean = title.trim()
+      const aliases = { ...this.#state.aliases, [id]: clean }
+      const apply = (s: SessionView): SessionView =>
+        s.id === id ? { ...s, title: clean, alias: clean } : s
+      this.#set({
+        aliases,
+        sessions: this.#state.sessions.map(apply),
+        active: this.#state.active ? apply(this.#state.active) : null,
+      })
       return { ok: true }
     } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : 'Gagal mengganti judul.' }
+      return { ok: false, error: err instanceof Error ? err.message : 'Gagal menyimpan alias.' }
+    }
+  }
+
+  /* Kembalikan judul asli: DELETE alias lalu judul tampil = judul upstream. */
+  async restoreSessionTitle(id: string): Promise<{ ok: boolean; error?: string }> {
+    try {
+      const res = await deleteSessionAlias(id)
+      if (!res.ok) {
+        return { ok: false, error: `Gagal mengembalikan judul (server ${res.status}).` }
+      }
+      const aliases = { ...this.#state.aliases }
+      delete aliases[id]
+      const apply = (s: SessionView): SessionView =>
+        s.id === id ? { ...s, title: s.titleUpstream ?? s.title, alias: null } : s
+      this.#set({
+        aliases,
+        sessions: this.#state.sessions.map(apply),
+        active: this.#state.active ? apply(this.#state.active) : null,
+      })
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : 'Gagal mengembalikan judul.' }
     }
   }
 

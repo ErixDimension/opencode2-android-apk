@@ -138,15 +138,29 @@ export async function deleteSession(id: string): Promise<{ ok: boolean; status: 
   return { ok: res.ok, status: res.status };
 }
 
-/* §7.5/§7.7 — PATCH/PUT/POST /api/session/:id semua 404 upstream (dibuktikan
-   discovery N4.4). Fungsi tetap ada untuk alur degradasi jujur: panggilan
-   gagal dan error ditampilkan, tidak berpura-pura tersimpan/diganti. */
-export async function updateSession(id: string, patch: { title?: string; model?: { id: string; providerID: string } }): Promise<{ ok: boolean; status: number }> {
-  const res = await request(`/api/session/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    body: JSON.stringify(patch),
+/* Alias judul lokal (N4.4.4) — disimpan adapter flux-webui sendiri di
+   <stateDir>/session-aliases.json. Upstream tidak punya endpoint ganti judul
+   (PATCH/PUT/POST /api/session/:id → 404, dibuktikan discovery N4.4), jadi
+   alias adalah satu-satunya jalur rename — judul upstream/CLI tidak berubah. */
+export async function getSessionAliases(): Promise<Record<string, string>> {
+  const res = await request('/api/session-alias');
+  const json = await readJson(res);
+  if (!json.ok) throw new Error(`getSessionAliases ${json.status}`);
+  const aliases = (json.data as { aliases?: Record<string, string> })?.aliases;
+  return aliases && typeof aliases === 'object' ? aliases : {};
+}
+
+export async function setSessionAlias(sessionID: string, title: string): Promise<{ ok: boolean; status: number }> {
+  const res = await request(`/api/session-alias/${encodeURIComponent(sessionID)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ title }),
     headers: { 'content-type': 'application/json' },
   });
+  return { ok: res.ok, status: res.status };
+}
+
+export async function deleteSessionAlias(sessionID: string): Promise<{ ok: boolean; status: number }> {
+  const res = await request(`/api/session-alias/${encodeURIComponent(sessionID)}`, { method: 'DELETE' });
   return { ok: res.ok, status: res.status };
 }
 
