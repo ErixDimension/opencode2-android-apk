@@ -1,10 +1,10 @@
-// SessionCard.tsx — §7.3/§7.4: satu kartu sesi dengan [data-state: active|run|idle],
-// animasi run (spinner 0,9s, "Sedang bekerja" + titik pulse 1,2s, sweep tak terduga
-// bila tidak ada data langkah nyata), rename (§7.5 — degradasi jujur: PATCH 404
-// upstream), delete (§7.6 — interrupt dulu bila berjalan, tidak pernah diam-diam
-// gagal), model (§7.7 — degradasi jujur: tidak ada endpoint ganti model upstream).
-import { useState, useCallback } from 'react'
-import { Edit2, Trash2 } from 'lucide-react'
+// SessionCard.tsx — §7.3/§7.4 (N4.4.3): anatomi kartu kolom — badan baris 1–4
+// di atas, baris aksi ikon di bawah. Akar BUKAN <button> (tombol bersarang =
+// HTML tidak valid); akar <div role="button"> dengan tombol aksi di dalamnya.
+// Semua baris teks ellipsis 1 baris; direktori dipotong di TENGAH.
+// Keadaan run: spinner 0,9s + "Sedang bekerja" + titik pulse + sweep.
+import { useState, useCallback, type KeyboardEvent } from 'react'
+import { Edit2, Trash2, Bot, BarChart3 } from 'lucide-react'
 import { sessionStore, type SessionView } from '../lib/sessionStore'
 
 interface Props {
@@ -42,6 +42,15 @@ function ctxClass(p: number | null | undefined): 'cyan' | 'warn' | 'critical' | 
   return 'cyan'
 }
 
+// Direktori panjang dipotong di TENGAH agar layout tidak didorong:
+// /data/data/com.termux/files/home → /data/…/home
+function truncatePath(p: string): string {
+  if (!p || p.length <= 32) return p
+  const parts = p.split('/').filter(Boolean)
+  if (parts.length <= 2) return p
+  return `/${parts[0]}/…/${parts[parts.length - 1]}`
+}
+
 export function SessionCard({
   session,
   activeID,
@@ -76,6 +85,13 @@ export function SessionCard({
     onSelect(session.id)
   }, [session.id, onSelect])
 
+  const handleKeySelect = useCallback((e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      handleSelect()
+    }
+  }, [handleSelect])
+
   const handleDelete = useCallback(async () => {
     setDelConfirm(false)
     try {
@@ -106,70 +122,92 @@ export function SessionCard({
   const statusChip = run ? 'run' : isActive ? 'active' : 'idle'
 
   return (
-    <button
-      type="button"
+    <div
       className="fx-session-card"
       data-state={statusChip}
+      role="button"
+      tabIndex={0}
       aria-pressed={isActive}
       onClick={handleSelect}
+      onKeyDown={handleKeySelect}
     >
-      <span className={`fx-session-card__node ${run ? 'running' : ''}`} aria-hidden={true} />
-      {run && <span className="fx-session-card__spin" aria-hidden="true" />}
-      <div className="fx-session-card__body">
-        <div className="fx-session-card__title">{session.title ?? '(tanpa judul)'}</div>
+      <div className="fx-session-card__row1">
+        <span className={`fx-session-card__node ${run ? 'running' : ''}`} aria-hidden="true" />
+        {run && <span className="fx-session-card__spin" aria-hidden="true" />}
+        <span className="fx-session-card__title">{session.title ?? '(tanpa judul)'}</span>
         {hasAlert && (
           <span className="fx-card-alert" title="Permintaan izin menunggu">
             izin menunggu
           </span>
         )}
-        {run ? (
-          <div className="fx-session-card__run">
-            Sedang bekerja
-            <span className="fx-session-card__run-dot" aria-hidden={true} />
-            <span className="fx-session-card__run-dot" aria-hidden={true} />
-            <span className="fx-session-card__run-dot" aria-hidden={true} />
-            {tokenTotal != null ? ` · ${formatTokens(tokenTotal)} token` : ''}
-          </div>
-        ) : (
-          <>
-            <span className={`fx-session-card__status ${statusChip}`}>{isActive ? 'AKTIF' : ''}</span>
-            {session.model?.id && <span className="fx-session-card__model">{session.model.id}</span>}
-            <span className="fx-session-card__meta">
-              {session.location?.directory ?? ''}
-              {tokenTotal != null ? ` · ${formatTokens(tokenTotal)} token` : ''}
-              {contextPct != null && (
-                <>
-                  · konteks <span className={`ctx ${ctxClass(contextPct)}`}>{contextPct}%</span>
-                </>
-              )}
-              {session.updatedAt ? ` · ${relativeTime(session.updatedAt)}` : ''}
-            </span>
-          </>
+        {statusChip !== 'idle' && (
+          <span className={`fx-session-card__status ${statusChip}`}>
+            {run ? 'PROSES' : 'AKTIF'}
+          </span>
         )}
-        {renaming && (
-          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-            <input
-              className="fx-textarea"
-              value={renameInput}
-              onChange={(e) => setRenameInput(e.target.value)}
-              autoFocus={true}
-            />
-            <button type="button" onClick={handleRename} disabled={!renameInput.trim() || renameInput.trim() === (session.title ?? '')}>
-              SIMPAN
-            </button>
-            <button type="button" onClick={() => { setRenaming(false); setRenameInput(session.title ?? ''); setRenameError(null) }}>
-              BATAL
-            </button>
-          </div>
-        )}
-        {renameError && <div className="fx-unsupported-chip" style={{ marginTop: 6 }}>{renameError}</div>}
-        {modelError && <div className="fx-unsupported-chip" style={{ marginTop: 6 }}>{modelError}</div>}
       </div>
-      <div className={`fx-session-card__ctxline ${ctxClass(contextPct)}`} style={{ width: `${contextPct ?? 0}%` }} />
+
+      {run ? (
+        <div className="fx-session-card__run">
+          Sedang bekerja
+          <span className="fx-session-card__run-dot" aria-hidden={true} />
+          <span className="fx-session-card__run-dot" aria-hidden={true} />
+          <span className="fx-session-card__run-dot" aria-hidden={true} />
+          {tokenTotal != null ? ` · ${formatTokens(tokenTotal)} token` : ''}
+        </div>
+      ) : (
+        <>
+          {session.model?.id && <span className="fx-session-card__model">{session.model.id}</span>}
+          <span className="fx-session-card__meta">
+            {session.location?.directory ? truncatePath(session.location.directory) : ''}
+            {tokenTotal != null ? ` · ${formatTokens(tokenTotal)} token` : ''}
+            {session.updatedAt ? ` · ${relativeTime(session.updatedAt)}` : ''}
+          </span>
+          <div className="fx-session-card__ctxrow">
+            <span className="fx-session-card__ctxline">
+              <span
+                className={`fx-session-card__ctxfill ${ctxClass(contextPct)}`}
+                style={{ width: `${contextPct ?? 0}%` }}
+              />
+            </span>
+            <span className={`fx-session-card__ctxlabel ${ctxClass(contextPct)}`}>
+              konteks {contextPct != null ? `${contextPct}%` : '—'}
+            </span>
+          </div>
+        </>
+      )}
+
+      {renaming && (
+        <div className="fx-session-card__rename">
+          <input
+            className="fx-textarea"
+            value={renameInput}
+            onChange={(e) => setRenameInput(e.target.value)}
+            autoFocus={true}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button type="button" onClick={(e) => { e.stopPropagation(); void handleRename() }} disabled={!renameInput.trim() || renameInput.trim() === (session.title ?? '')}>
+            SIMPAN
+          </button>
+          <button type="button" onClick={(e) => { e.stopPropagation(); setRenaming(false); setRenameInput(session.title ?? ''); setRenameError(null) }}>
+            BATAL
+          </button>
+        </div>
+      )}
+      {renameError && <div className="fx-unsupported-chip">{renameError}</div>}
+      {modelError && <div className="fx-unsupported-chip">{modelError}</div>}
+
       {run && <div className="fx-session-card__sweep" aria-hidden="true" />}
-      <div className="fx-session-card__actions">
-        {!run && (
-          <>
+
+      {delConfirm ? (
+        <div className="fx-session-card__confirm">
+          <span>Hapus sesi ini?</span>
+          <button type="button" onClick={(e) => { e.stopPropagation(); setDelConfirm(false) }}>Batal</button>
+          <button type="button" className="delete" onClick={(e) => { e.stopPropagation(); void handleDelete() }}>HAPUS</button>
+        </div>
+      ) : (
+        <div className="fx-session-card__actions">
+          {!run && (
             <button
               type="button"
               title="Ganti nama judul sesi"
@@ -177,42 +215,35 @@ export function SessionCard({
             >
               <Edit2 size={16} />
             </button>
-            {isActive && (
-              <button
-                type="button"
-                title="Buka statistik sesi"
-                onClick={(e) => { e.stopPropagation(); sessionStore.openUsageSheet() }}
-              >
-                Statistik sesi
-              </button>
-            )}
-          </>
-        )}
-        <button
-          type="button"
-          className="delete"
-          title="Hapus sesi"
-          onClick={(e) => { e.stopPropagation(); setDelConfirm((c) => !c); setRenaming(false); setModelError(null) }}
-        >
-          <Trash2 size={16} />
-        </button>
-        {delConfirm && (
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginLeft: 8 }}>
-            <span className="fx-session-card__meta" style={{ color: 'var(--fx-red)', whiteSpace: 'nowrap' }}>Hapus sesi ini?</span>
-            <button type="button" onClick={() => setDelConfirm(false)}>Batal</button>
-            <button type="button" className="delete" onClick={handleDelete}>HAPUS</button>
-          </div>
-        )}
-        {!run && session.model?.id && !delConfirm && !renaming && (
+          )}
+          {!run && isActive && (
+            <button
+              type="button"
+              title="Buka statistik sesi"
+              onClick={(e) => { e.stopPropagation(); sessionStore.openUsageSheet() }}
+            >
+              <BarChart3 size={16} />
+            </button>
+          )}
           <button
             type="button"
-            title="Model: ganti tidak didukung server"
-            onClick={(e) => { e.stopPropagation(); setModelError('Ganti model tidak didukung oleh server (PATCH /api/session/:id → 404)') }}
+            className="delete"
+            title="Hapus sesi"
+            onClick={(e) => { e.stopPropagation(); setDelConfirm(true); setRenaming(false); setModelError(null) }}
           >
-            model
+            <Trash2 size={16} />
           </button>
-        )}
-      </div>
-    </button>
+          {!run && session.model?.id && (
+            <button
+              type="button"
+              title="Model: ganti tidak didukung server"
+              onClick={(e) => { e.stopPropagation(); setModelError('Ganti model tidak didukung oleh server (PATCH /api/session/:id → 404)') }}
+            >
+              <Bot size={16} />
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   )
 }

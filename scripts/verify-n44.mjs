@@ -490,12 +490,54 @@ async function main() {
       `desc=${h16d} reverse=${h16dReverse}`
     )
 
+    // ================= N4.4.3: H17 =================
+
+    const listSrc3 = readFileRel('src/components/SessionList.tsx')
+    const cardSrc3 = readFileRel('src/components/SessionCard.tsx')
+    const newSrc = readFileRel('src/components/NewSessionDialog.tsx')
+    const cssSrc3 = readFileRel('src/styles/spine-flux.css')
+
+    // ---- H17a: pemicu "Sesi baru" di bar aksi TETAP (di luar area scroll);
+    //           kartu --add tidak lagi ada di area scroll ----
+    const scrollIdx = listSrc3.indexOf('fx-session-list__scroll')
+    const preScroll = scrollIdx >= 0 ? listSrc3.slice(0, scrollIdx) : ''
+    const scrollArea = scrollIdx >= 0 ? listSrc3.slice(scrollIdx) : listSrc3
+    const h17aActions = preScroll.includes('fx-session-list__actions') && preScroll.includes('Sesi baru') && preScroll.includes('onNew')
+    const h17aNoAddCard = !scrollArea.includes('fx-session-card--add')
+    assert(
+      'H17a pemicu "Sesi baru" di bar aksi tetap di luar .fx-session-list__scroll; kartu --add tidak ada di area scroll',
+      h17aActions && h17aNoAddCard,
+      `actions=${h17aActions} noAddCard=${h17aNoAddCard}`
+    )
+
+    // ---- H17b: akar kartu BUKAN <button>; aksi memakai ikon (tidak ada
+    //           tombol teks "Statistik sesi" / "model") ----
+    const h17bRootDiv = cardSrc3.includes('<div') && /className="fx-session-card"/.test(cardSrc3) && !/className="fx-session-card"[\s\S]{0,80}type="button"/.test(cardSrc3)
+    const h17bIcons = ['Edit2', 'BarChart3', 'Trash2', 'Bot'].every((ic) => cardSrc3.includes(ic))
+    const h17bNoTextButtons = !cardSrc3.includes('>Statistik sesi<') && !/>\s*model\s*</.test(cardSrc3)
+    assert(
+      'H17b akar .fx-session-card = <div> (bukan <button>); tombol aksi ikon, bukan teks lebar',
+      h17bRootDiv && h17bIcons && h17bNoTextButtons,
+      `rootDiv=${h17bRootDiv} icons=${h17bIcons} noTextButtons=${h17bNoTextButtons}`
+    )
+
+    // ---- H17c: dialog memakai .fx-newsession (bukan fx-permission-sheet);
+    //           kotak model max-height + overflow-y:auto ----
+    const h17cOwnClass = newSrc.includes('className="fx-newsession"') && !/className="fx-permission-sheet"/.test(newSrc)
+    const modelsBlock = (cssSrc3.match(/\.fx-newsession__models\s*\{[^}]*\}/) ?? [''])[0]
+    const h17cBox = /max-height\s*:/.test(modelsBlock) && /overflow-y\s*:\s*auto/.test(modelsBlock)
+    assert(
+      'H17c dialog memakai .fx-newsession (bukan .fx-permission-sheet) + kotak model max-height & overflow-y:auto',
+      h17cOwnClass && h17cBox,
+      `ownClass=${h17cOwnClass} box=${h17cBox}`
+    )
+
   } finally {
     adapter.kill()
     cleanup()
   }
 
-  log(`HASIL: ${failures === 0 ? 'SEMUA PASS (H0-H16)' : failures + ' ASSERTION GAGAL'}`)
+  log(`HASIL: ${failures === 0 ? 'SEMUA PASS (H0-H17)' : failures + ' ASSERTION GAGAL'}`)
   process.exit(failures === 0 ? 0 : 1)
 }
 

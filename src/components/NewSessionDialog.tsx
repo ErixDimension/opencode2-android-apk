@@ -1,10 +1,12 @@
-// NewSessionDialog.tsx — §7.8: lembar sesi baru dari bawah.
-// SERVER (lokal Termux saja), PROJECT, WORKING DIRECTORY, lalu NAMA SESI →
-// PILIH MODEL (radio, daftar dari upstream /api/model) → RUN IN: Local (default).
-// "New worktree" disembunyikan: isolasi worktree belum terbukti upstream discovery.
-// START CHAT → POST /api/session {title, model, directory} (terbukti 200).
-import { useState, useEffect, useCallback } from 'react'
+// NewSessionDialog.tsx — §7.8 (N4.4.3): lembar ringkas dengan kelas sendiri
+// (.fx-newsession*), tidak lagi meminjam .fx-permission-sheet. Kepala + kaki
+// tetap; tengah tidak scroll sebagai satu halaman; hanya kotak model yang
+// scroll (±180px). Urutan: SERVER → PROJECT → WORKING DIRECTORY → ① NAMA →
+// ② MODEL → ③ RUN IN → kaki (Batal / START CHAT). "New worktree" disembunyikan
+// (isolasi worktree belum terbukti upstream). START CHAT → POST /api/session.
+import { useState, useEffect } from 'react'
 import { sessionStore } from '../lib/sessionStore'
+import { useSessionStore } from '../lib/useSessionStore'
 import { getModelList } from '../lib/apiClient'
 import { X, Play } from 'lucide-react'
 
@@ -13,6 +15,7 @@ interface Props {
 }
 
 export function NewSessionDialog({ onClose }: Props) {
+  const state = useSessionStore()
   const [models, setModels] = useState<{ id: string; providerID: string }[]>([])
   const [title, setTitle] = useState('')
   const [directory, setDirectory] = useState('')
@@ -20,19 +23,24 @@ export function NewSessionDialog({ onClose }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const loadModels = useCallback(async () => {
-    try {
-      const list = await getModelList()
-      setModels(list)
-      if (list.length > 0 && !selected) setSelected(list[0].id)
-    } catch {
-      // daftar model gagal: dialog tetap bisa dikirim tanpa model (upstream default)
-    }
-  }, [selected])
+  const activeModelID = state.active?.model?.id
 
   useEffect(() => {
-    void loadModels()
-  }, [loadModels])
+    let alive = true
+    void (async () => {
+      try {
+        const list = await getModelList()
+        if (!alive) return
+        setModels(list)
+        // Bawaan: model sesi aktif bila ada di daftar; selain itu item pertama.
+        const preferred = list.find((m) => m.id === activeModelID) ?? list[0]
+        if (preferred) setSelected((prev) => prev ?? preferred.id)
+      } catch {
+        // daftar model gagal: dialog tetap bisa dikirim tanpa model (upstream default)
+      }
+    })()
+    return () => { alive = false }
+  }, [activeModelID])
 
   const handleStart = async () => {
     setError(null)
@@ -58,47 +66,53 @@ export function NewSessionDialog({ onClose }: Props) {
   }
 
   return (
-    <div className="fx-permission-sheet" role="dialog" aria-modal="true" aria-label="Sesi baru" onClick={(e) => e.stopPropagation()}>
-      <div className="fx-permission-sheet__head">
-        <span className="fx-permission-sheet__title">Sesi baru</span>
-        <button type="button" onClick={onClose}>
-          <X size={18} /> tutup
+    <div className="fx-newsession" role="dialog" aria-modal="true" aria-label="Sesi baru" onClick={(e) => e.stopPropagation()}>
+      <div className="fx-newsession__head">
+        <span className="fx-newsession__title">Sesi baru</span>
+        <button type="button" onClick={onClose} aria-label="Tutup">
+          <X size={18} />
         </button>
       </div>
-      <div className="fx-permission-sheet__body">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
-          <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fx-cyan)' }}>SERVER</span>
-          <span style={{ fontSize: '12px', fontFamily: 'ui-monospace, Menlo, monospace', color: 'var(--fx-text)' }}>Lokal (Termux)</span>
+
+      <div className="fx-newsession__body">
+        <div className="fx-newsession__row">
+          <span className="fx-newsession__label">SERVER</span>
+          <label className="fx-newsession__radio">
+            <input type="radio" name="server" checked readOnly />
+            Lokal (Termux)
+          </label>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
-          <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fx-cyan)' }}>PROJECT</span>
-          <span style={{ fontSize: '12px', fontFamily: 'ui-monospace, Menlo, monospace', color: 'var(--fx-muted)' }}>— (tidak terisolasi)</span>
+
+        <div className="fx-newsession__row">
+          <span className="fx-newsession__label">PROJECT</span>
+          <span className="fx-newsession__value">— (tidak terisolasi)</span>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
-          <label style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fx-cyan)' }}>WORKING DIRECTORY</label>
+
+        <label className="fx-newsession__field">
+          <span className="fx-newsession__label">WORKING DIRECTORY</span>
           <input
             className="fx-textarea"
             value={directory}
             onChange={(e) => setDirectory(e.target.value)}
             placeholder="(default upstream)"
-            style={{ marginTop: 4, width: '100%', boxSizing: 'border-box' }}
           />
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
-          <label style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fx-cyan)' }}>NAMA SESI</label>
+        </label>
+
+        <label className="fx-newsession__field">
+          <span className="fx-newsession__label">① NAMA SESI</span>
           <input
             className="fx-textarea"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="mis. pengujian flux 1"
-            style={{ marginTop: 4, width: '100%', boxSizing: 'border-box' }}
           />
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
-          <label style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fx-cyan)' }}>PILIH MODEL</label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+        </label>
+
+        <div className="fx-newsession__field">
+          <span className="fx-newsession__label">② PILIH MODEL</span>
+          <div className="fx-newsession__models">
             {models.map((m) => (
-              <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+              <label key={m.id} className="fx-newsession__model">
                 <input
                   type="radio"
                   name="model"
@@ -106,32 +120,41 @@ export function NewSessionDialog({ onClose }: Props) {
                   checked={selected === m.id}
                   onChange={() => setSelected(m.id)}
                 />
-                <span style={{ fontSize: '12px', fontFamily: 'ui-monospace, Menlo, monospace', color: 'var(--fx-text)' }}>{m.id}</span>
-                <span style={{ fontSize: '11px', color: 'var(--fx-muted)' }}>{m.providerID}</span>
+                <span className="fx-newsession__model-id">{m.id}</span>
+                <span className="fx-newsession__model-provider">{m.providerID}</span>
               </label>
             ))}
             {models.length === 0 && (
-              <span style={{ fontSize: '12px', color: 'var(--fx-muted)', fontFamily: 'ui-monospace, Menlo, monospace' }}>
+              <span className="fx-newsession__models-empty">
                 (daftar model tidak tersedia — upstream default)
               </span>
             )}
           </div>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
-          <label style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fx-cyan)' }}>RUN IN</label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '12px', fontFamily: 'ui-monospace, Menlo, monospace', color: 'var(--fx-text)' }}>
-            <input type="radio" name="runin" value="local" defaultChecked={true} readOnly={true} />
+
+        <div className="fx-newsession__row">
+          <span className="fx-newsession__label">③ RUN IN</span>
+          <label className="fx-newsession__radio">
+            <input type="radio" name="runin" value="local" checked readOnly />
             Local (default)
           </label>
-          <span style={{ marginLeft: 8, fontSize: '11px', color: 'var(--fx-red)' }}>
-            New worktree disembunyikan (belum terbukti upstream)
-          </span>
         </div>
-        {error && <div className="fx-unsupported-chip" style={{ marginTop: 10 }}>{error}</div>}
+
+        <span className="fx-newsession__note">
+          New worktree disembunyikan (belum terbukti upstream)
+        </span>
+
+        {error && <div className="fx-unsupported-chip">{error}</div>}
       </div>
-      <div className="fx-permission-actions">
+
+      <div className="fx-newsession__footer">
         <button type="button" onClick={onClose}>Batal</button>
-        <button type="button" className="allow-once" onClick={handleStart} disabled={loading || !title.trim()}>
+        <button
+          type="button"
+          className="primary"
+          onClick={handleStart}
+          disabled={loading || !title.trim()}
+        >
           <Play size={16} /> {loading ? 'Membuat…' : 'START CHAT'}
         </button>
       </div>
