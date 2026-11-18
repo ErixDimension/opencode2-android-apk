@@ -643,23 +643,62 @@ async function main() {
       `search=${h18bSearch} shield=${h18bShield} saved=${h18bSaved}`
     )
 
-    // ---- H18c (source/CSS): kartu video — rounded 14px, node 34px,
-    //      border per data-state sesuai §2 ----
+    // ---- H18c (source/CSS): kartu video — rounded 14px, node 28px
+    //      (N4.4.5 merampingkan dari 34px), border per data-state sesuai §2 ----
     const h18cBase = (cssSrc4.match(/\.fx-session-card\s*\{[^}]*\}/) ?? [''])[0]
     const h18cNode = (cssSrc4.match(/\.fx-session-card__node\s*\{[^}]*\}/) ?? [''])[0]
     const stateBlock = (name) =>
       (cssSrc4.match(new RegExp(`\\.fx-session-card\\[data-state="${name}"\\]\\s*\\{[^}]*\\}`)) ?? [''])[0]
     const h18cRadius = /border-radius:\s*1[2-6]px/.test(h18cBase)
-    const h18cNode34 = /width:\s*34px/.test(h18cNode) && /height:\s*34px/.test(h18cNode)
+    const h18cNode28 = /width:\s*28px/.test(h18cNode) && /height:\s*28px/.test(h18cNode)
     const h18cActive =
       /rgba\(56,\s*189,\s*248,\s*0?\.55\)/.test(stateBlock('active')) &&
       /linear-gradient/.test(stateBlock('active'))
     const h18cRun = /rgba\(251,\s*191,\s*36,\s*0?\.55\)/.test(stateBlock('run'))
     const h18cIdle = /rgba\(255,\s*255,\s*255,\s*0?\.08\)/.test(stateBlock('idle'))
     assert(
-      'H18c kartu video: border-radius 14px (±2), node 34px, border per data-state (aktif cyan+gradasi, run amber, idle redup)',
-      h18cRadius && h18cNode34 && h18cActive && h18cRun && h18cIdle,
-      `radius=${h18cRadius} node34=${h18cNode34} active=${h18cActive} run=${h18cRun} idle=${h18cIdle}`
+      'H18c kartu video: border-radius 14px (±2), node 28px (ramping N4.4.5), border per data-state (aktif cyan+gradasi, run amber, idle redup)',
+      h18cRadius && h18cNode28 && h18cActive && h18cRun && h18cIdle,
+      `radius=${h18cRadius} node28=${h18cNode28} active=${h18cActive} run=${h18cRun} idle=${h18cIdle}`
+    )
+
+    // ================= N4.4.5: H19 =================
+
+    const cardSrc5 = readFileRel('src/components/SessionCard.tsx')
+    const cssSrc5 = readFileRel('src/styles/spine-flux.css')
+
+    // ---- H19a: satu tinggi kartu --fx-card-h + border-box ----
+    const h19Base = (cssSrc5.match(/\.fx-session-card\s*\{[^}]*\}/) ?? [''])[0]
+    const h19Var = /--fx-card-h:\s*68px/.test(cssSrc5)
+    const h19Height = /height:\s*var\(--fx-card-h\)/.test(h19Base) && /box-sizing:\s*border-box/.test(h19Base)
+    assert(
+      'H19a .fx-session-card memakai --fx-card-h: 68px + height variabel + box-sizing border-box',
+      h19Var && h19Height,
+      `var=${h19Var} height=${h19Height}`
+    )
+
+    // ---- H19b: MarqueeText dipakai judul/model/meta + keyframes ada ----
+    const h19MarqueeFn = /function\s+MarqueeText\s*\(/.test(cardSrc5)
+    const h19MarqueeUses = (cardSrc5.match(/<MarqueeText\b/g) ?? []).length
+    const h19MarqueeTargets = ['fx-session-card__title', 'fx-session-card__model', 'fx-session-card__meta']
+      .every((cls) => cardSrc5.includes(`className="${cls}"`))
+    const h19Keyframes =
+      /@keyframes\s+fx-marquee\s*\{[\s\S]*?var\(--fx-shift\)/.test(cssSrc5)
+    assert(
+      'H19b MarqueeText ada + dipakai judul/model/meta di SessionCard; @keyframes fx-marquee memakai --fx-shift',
+      h19MarqueeFn && h19MarqueeUses >= 3 && h19MarqueeTargets && h19Keyframes,
+      `fn=${h19MarqueeFn} uses=${h19MarqueeUses} targets=${h19MarqueeTargets} keyframes=${h19Keyframes}`
+    )
+
+    // ---- H19c: baris model SELALU dirender (tanpa kondisional yang menghilangkannya) ----
+    const h19ModelRow = /<MarqueeText\s+className="fx-session-card__model"\s+text=\{modelText\}\s*\/>/.test(cardSrc5)
+    const h19NoConditionalModelRow =
+      !/session\.model\?\.id\s*&&\s*<[^>]*fx-session-card__model/.test(cardSrc5) &&
+      !/session\.model\s*&&\s*<[^>]*fx-session-card__model/.test(cardSrc5)
+    assert(
+      'H19c baris model dirender tanpa kondisional; sesi tanpa model tetap punya baris kosong setinggi 15px',
+      h19ModelRow && h19NoConditionalModelRow,
+      `modelRow=${h19ModelRow} unconditional=${h19NoConditionalModelRow}`
     )
 
   } finally {
@@ -667,7 +706,7 @@ async function main() {
     cleanup()
   }
 
-  log(`HASIL: ${failures === 0 ? 'SEMUA PASS (H0-H18)' : failures + ' ASSERTION GAGAL'}`)
+  log(`HASIL: ${failures === 0 ? 'SEMUA PASS (H0-H19)' : failures + ' ASSERTION GAGAL'}`)
   process.exit(failures === 0 ? 0 : 1)
 }
 

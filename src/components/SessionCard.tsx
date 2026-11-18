@@ -1,12 +1,19 @@
-// SessionCard.tsx — §2 N4.4.4: bentuk kartu PERSIS frame video panel-sesi-flow:
-// blok rounded terpisah, node lingkaran 34px, border+warna latar per status,
-// aksi ikon di kanan atas, meta "<waktu> · <token> token · konteks N%",
-// hairline konteks di tepi bawah. Akar <div role="button"> (bukan <button>).
-// Direktori pindah ke atribut title kartu (tidak lagi di muka kartu).
-// Rename = alias lokal (PUT /api/session-alias) — konsol menggantikan baris
-// model+meta; bila ada alias tampil "judul asli … · Kembalikan".
-import { useState, useCallback, type KeyboardEvent } from 'react'
-import { Edit2, Trash2, Bot, BarChart3 } from 'lucide-react'
+// SessionCard.tsx — §1/§2 N4.4.5: kartu SOLID. Tinggi SELALU
+// var(--fx-card-h) (68px), apa pun isinya: idle/aktif/run, konsol rename,
+// maupun konfirmasi hapus. Kerangka tetap: node 28px + kolom isi tiga baris
+// (judul 20px, model 15px, meta 15px). Baris model SELALU dirender walau
+// kosong. Judul/model/meta memakai MarqueeText: teks yang muat diam, teks
+// berlebih berjalan kiri-jeda-kanan (bukan ellipsis diam-diam).
+// Akar <div role="button">; tombol aksi selalu di baris judul, tidak wrap.
+import {
+  useState,
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  type CSSProperties,
+  type KeyboardEvent,
+} from 'react'
+import { Edit2, Trash2, Bot, BarChart3, Undo2 } from 'lucide-react'
 import { sessionStore, type SessionView } from '../lib/sessionStore'
 
 interface Props {
@@ -20,6 +27,69 @@ interface Props {
   onDelete: (sessionID: string) => Promise<void>
   onRename: (sessionID: string, title: string) => Promise<{ ok: boolean; error?: string }>
   onRestoreAlias: (sessionID: string) => Promise<{ ok: boolean; error?: string }>
+}
+
+/*──────────────────────────────────────────────────────────────────────
+  MarqueeText — teks berjalan hanya bila lebar teks > lebar wadah.
+  --fx-shift = -(lebar teks - lebar wadah), dari pengukuran nyata.
+  Durasi sebanding jarak (±30px/detik), minimum 3 detik.
+──────────────────────────────────────────────────────────────────────*/
+function MarqueeText({
+  text,
+  className,
+  title,
+}: {
+  text: string
+  className?: string
+  title?: string
+}) {
+  const boxRef = useRef<HTMLSpanElement | null>(null)
+  const innerRef = useRef<HTMLSpanElement | null>(null)
+  const [shift, setShift] = useState(0)
+  const [duration, setDuration] = useState(3)
+
+  useLayoutEffect(() => {
+    const box = boxRef.current
+    const inner = innerRef.current
+    if (!box || !inner) return
+
+    const measure = () => {
+      const available = box.clientWidth
+      const full = inner.scrollWidth
+      const overflow = full - available
+      if (available > 0 && overflow > 1) {
+        setShift(-overflow)
+        setDuration(Math.max(3, overflow / 30))
+      } else {
+        setShift(0)
+        setDuration(3)
+      }
+    }
+
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(measure)
+    ro.observe(box)
+    ro.observe(inner)
+    return () => ro.disconnect()
+  }, [text])
+
+  const style: CSSProperties | undefined =
+    shift < 0
+      ? ({ '--fx-shift': `${shift}px`, animationDuration: `${duration}s` } as CSSProperties)
+      : undefined
+
+  return (
+    <span
+      ref={boxRef}
+      className={`fx-marquee ${shift < 0 ? 'fx-marquee--active' : ''} ${className ?? ''}`}
+      title={title}
+    >
+      <span ref={innerRef} className="fx-marquee__inner" style={style}>
+        {text}
+      </span>
+    </span>
+  )
 }
 
 function relativeTime(ts?: number): string {
@@ -74,6 +144,12 @@ export function SessionCard({
   const [renameError, setRenameError] = useState<string | null>(null)
   const [modelError, setModelError] = useState<string | null>(null)
 
+  const closeRename = useCallback(() => {
+    setRenaming(false)
+    setRenameInput(session.title ?? '')
+    setRenameError(null)
+  }, [session.title])
+
   const handleSelect = useCallback(() => {
     setDelConfirm(false)
     setRenaming(false)
@@ -102,9 +178,7 @@ export function SessionCard({
   const handleRename = useCallback(async () => {
     const title = renameInput.trim()
     if (!title || title === (session.title ?? '')) {
-      setRenaming(false)
-      setRenameInput(session.title ?? '')
-      setRenameError(null)
+      closeRename()
       return
     }
     const res = await onRename(session.id, title)
@@ -115,7 +189,7 @@ export function SessionCard({
       // Gagal jaringan/server: chip error jujur, konsol tetap terbuka.
       setRenameError(res.error ?? 'Gagal menyimpan alias.')
     }
-  }, [session.id, session.title, renameInput, onRename])
+  }, [session.id, session.title, renameInput, onRename, closeRename])
 
   const handleRestore = useCallback(async () => {
     const res = await onRestoreAlias(session.id)
@@ -130,12 +204,17 @@ export function SessionCard({
 
   const statusChip = run ? 'run' : isActive ? 'active' : 'idle'
   const directory = session.location?.directory ?? ''
+  // Baris model SELALU ada; tanpa model cukup teks kosong setinggi baris.
+  const modelText = session.model?.id ?? ''
 
   const metaParts: string[] = []
   const rel = relativeTime(session.updatedAt)
   if (rel) metaParts.push(rel)
   if (tokenTotal != null) metaParts.push(`${formatTokens(tokenTotal)} token`)
   metaParts.push(`konteks ${contextPct != null ? `${contextPct}%` : '—'}`)
+  const metaText = metaParts.join(' · ')
+
+  const visibleError = renameError ?? modelError
 
   return (
     <div
@@ -155,7 +234,11 @@ export function SessionCard({
 
         <div className="fx-session-card__content">
           <div className="fx-session-card__row1">
-            <span className="fx-session-card__title">{session.title ?? '(tanpa judul)'}</span>
+            <MarqueeText
+              className="fx-session-card__title"
+              text={session.title ?? '(tanpa judul)'}
+              title={session.title ?? ''}
+            />
             {hasAlert && (
               <span className="fx-card-alert" title="Permintaan izin menunggu">
                 izin menunggu
@@ -167,94 +250,90 @@ export function SessionCard({
               </span>
             )}
 
-            <div className="fx-session-card__actionslot">
-              {delConfirm ? (
-                <div className="fx-session-card__confirm">
-                  <span>Hapus sesi ini?</span>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setDelConfirm(false) }}
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="button"
-                    className="delete"
-                    onClick={(e) => { e.stopPropagation(); void handleDelete() }}
-                  >
-                    HAPUS
-                  </button>
-                </div>
-              ) : (
-                <div className="fx-session-card__actions">
-                  <button
-                    type="button"
-                    title="Ganti nama judul sesi (alias lokal)"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setRenameInput(session.title ?? '')
-                      setRenaming(true)
-                      setRenameError(null)
-                      setModelError(null)
-                    }}
-                  >
-                    <Edit2 size={15} />
-                  </button>
-                  {isActive && (
-                    <button
-                      type="button"
-                      title="Buka statistik sesi"
-                      onClick={(e) => { e.stopPropagation(); sessionStore.openUsageSheet() }}
-                    >
-                      <BarChart3 size={15} />
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="delete"
-                    title="Hapus sesi"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setDelConfirm(true)
-                      setRenaming(false)
-                      setModelError(null)
-                    }}
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                  {session.model?.id && (
-                    <button
-                      type="button"
-                      title="Model: ganti tidak didukung server"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setModelError('Ganti model tidak didukung oleh server (PATCH /api/session/:id → 404)')
-                      }}
-                    >
-                      <Bot size={15} />
-                    </button>
-                  )}
-                </div>
+            <div className="fx-session-card__actions">
+              <button
+                type="button"
+                title="Ganti nama judul sesi (alias lokal)"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setRenameInput(session.title ?? '')
+                  setRenaming(true)
+                  setDelConfirm(false)
+                  setRenameError(null)
+                  setModelError(null)
+                }}
+              >
+                <Edit2 size={13} />
+              </button>
+              {isActive && (
+                <button
+                  type="button"
+                  title="Buka statistik sesi"
+                  onClick={(e) => { e.stopPropagation(); sessionStore.openUsageSheet() }}
+                >
+                  <BarChart3 size={13} />
+                </button>
+              )}
+              <button
+                type="button"
+                className="delete"
+                title="Hapus sesi"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setDelConfirm(true)
+                  setRenaming(false)
+                  setRenameError(null)
+                  setModelError(null)
+                }}
+              >
+                <Trash2 size={13} />
+              </button>
+              {session.model?.id && (
+                <button
+                  type="button"
+                  title="Model: ganti tidak didukung server"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setModelError('Ganti model tidak didukung oleh server (PATCH /api/session/:id → 404)')
+                  }}
+                >
+                  <Bot size={13} />
+                </button>
               )}
             </div>
           </div>
 
-          {renaming ? (
-            <div className="fx-session-card__rename">
-              <div className="fx-session-card__rename-row">
+          {/* Zona tukar tetap 30px: model+meta / run / rename / konfirmasi hapus. */}
+          <div className="fx-session-card__zone">
+            {delConfirm ? (
+              <div className="fx-session-card__confirmrow">
+                <span>Hapus sesi ini?</span>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setDelConfirm(false) }}
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  className="delete"
+                  onClick={(e) => { e.stopPropagation(); void handleDelete() }}
+                >
+                  HAPUS
+                </button>
+              </div>
+            ) : renaming ? (
+              <div className="fx-session-card__rename">
                 <input
                   value={renameInput}
                   maxLength={80}
+                  title={session.titleUpstream ? `judul asli: ${session.titleUpstream}` : undefined}
                   onChange={(e) => setRenameInput(e.target.value)}
                   autoFocus={true}
                   onClick={(e) => e.stopPropagation()}
                   onKeyDown={(e) => {
                     e.stopPropagation()
-                    if (e.key === 'Escape') {
-                      setRenaming(false)
-                      setRenameInput(session.title ?? '')
-                      setRenameError(null)
-                    }
+                    if (e.key === 'Escape') closeRename()
                     if (e.key === 'Enter') void handleRename()
                   }}
                 />
@@ -266,49 +345,53 @@ export function SessionCard({
                 >
                   SIMPAN
                 </button>
+                {session.alias && (
+                  <button
+                    type="button"
+                    className="icon"
+                    title={`Kembalikan judul asli: ${session.titleUpstream ?? ''}`}
+                    aria-label="Kembalikan judul asli"
+                    onClick={(e) => { e.stopPropagation(); void handleRestore() }}
+                  >
+                    <Undo2 size={13} />
+                  </button>
+                )}
                 <button
                   type="button"
                   className="cancel"
                   title="Batal (Esc)"
                   aria-label="Batal"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setRenaming(false)
-                    setRenameInput(session.title ?? '')
-                    setRenameError(null)
-                  }}
+                  onClick={(e) => { e.stopPropagation(); closeRename() }}
                 >
                   ✕
                 </button>
               </div>
-              {session.alias && session.titleUpstream && (
-                <div className="fx-session-card__alias-hint">
-                  <span>judul asli: {session.titleUpstream}</span>
-                  <span>·</span>
-                  <button type="button" onClick={(e) => { e.stopPropagation(); void handleRestore() }}>
-                    Kembalikan
-                  </button>
+            ) : (
+              <>
+                <div className="fx-session-card__modelrow">
+                  <MarqueeText className="fx-session-card__model" text={modelText} />
                 </div>
-              )}
-            </div>
-          ) : (
-            <>
-              {session.model?.id && <span className="fx-session-card__model">{session.model.id}</span>}
-              {run ? (
-                <div className="fx-session-card__run">
-                  Sedang bekerja
-                  <span className="fx-session-card__run-dot" aria-hidden={true} />
-                  <span className="fx-session-card__run-dot" aria-hidden={true} />
-                  <span className="fx-session-card__run-dot" aria-hidden={true} />
+                <div className="fx-session-card__metarow">
+                  {run ? (
+                    <div className="fx-session-card__run">
+                      Sedang bekerja
+                      <span className="fx-session-card__run-dot" aria-hidden={true} />
+                      <span className="fx-session-card__run-dot" aria-hidden={true} />
+                      <span className="fx-session-card__run-dot" aria-hidden={true} />
+                    </div>
+                  ) : (
+                    <MarqueeText className="fx-session-card__meta" text={metaText} />
+                  )}
                 </div>
-              ) : (
-                <span className="fx-session-card__meta">{metaParts.join(' · ')}</span>
-              )}
-            </>
-          )}
+              </>
+            )}
+          </div>
 
-          {renameError && <div className="fx-unsupported-chip">{renameError}</div>}
-          {modelError && <div className="fx-unsupported-chip">{modelError}</div>}
+          {visibleError && (
+            <div className="fx-session-card__error" title={visibleError}>
+              {visibleError}
+            </div>
+          )}
         </div>
       </div>
 
